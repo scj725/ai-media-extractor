@@ -5,6 +5,10 @@
 // @description  在豆包对话页面提取无水印图片/视频，支持一键下载
 // @description:en Extract watermark-free images/videos from Doubao chat pages with one-click download
 // @author       Local maintainer
+// @homepage     https://github.com/scj725/ai-media-extractor
+// @supportURL   https://github.com/scj725/ai-media-extractor/issues
+// @updateURL    https://raw.githubusercontent.com/scj725/ai-media-extractor/main/extension/tampermonkey-script/ai-media-extractor.user.js
+// @downloadURL  https://raw.githubusercontent.com/scj725/ai-media-extractor/main/extension/tampermonkey-script/ai-media-extractor.user.js
 // @match        https://www.doubao.com/thread/*
 // @match        https://www.doubao.com/chat/*
 // @match        https://www.qianwen.com/chat/*

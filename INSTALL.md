@@ -1,44 +1,79 @@
-# AI 素材提取器：安装与使用
+# 安装与使用
 
-## 本地 API
+## 本地 Web/API 服务
 
-在项目目录执行：
+### 使用 uv
 
 ```powershell
+cd D:\插件\ai-media-extractor
+uv sync
+uv run uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+### 使用 pip
+
+```powershell
+cd D:\插件\ai-media-extractor
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-浏览器打开 `http://127.0.0.1:8000`，选择图片或视频，粘贴豆包或千问链接后解析。
+打开 `http://127.0.0.1:8000` 使用图形界面，或打开 `http://127.0.0.1:8000/docs` 查看并测试 API。
 
-若系统使用代理，程序会读取 Windows 系统代理。也可以在启动前设置：
+## API 调用
+
+图片：
 
 ```powershell
-$env:HTTPS_PROXY = "http://127.0.0.1:7890"
-$env:HTTP_PROXY = "http://127.0.0.1:7890"
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/parse -ContentType 'application/json' -Body '{"url":"https://www.doubao.com/thread/xxxxxxxx"}'
 ```
+
+视频：
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/parse-video -ContentType 'application/json' -Body '{"url":"https://www.doubao.com/thread/xxxxxxxx"}'
+```
+
+将请求体中的 URL 换成自己的豆包或千问分享链接。加入 `"return_raw": true` 可查看平台原始响应。
 
 ## Chrome / Edge 扩展
 
 1. 打开 `chrome://extensions/` 或 `edge://extensions/`。
 2. 开启开发者模式。
 3. 点击“加载已解压的扩展程序”。
-4. 选择本项目的 `extension\edge` 目录。
-5. 登录目标平台并刷新目标页面，点击右下角素材按钮。
+4. 选择 `D:\插件\ai-media-extractor\extension\edge`。
+5. 登录目标平台并刷新页面，点击右下角素材按钮。
 
-注意：不要加载项目根目录。Python 运行产生的 `__pycache__` 目录会被浏览器拒绝，`extension\edge` 才是扩展根目录。
+更新代码后，回到扩展管理页点击“重新加载”，然后用 `Ctrl + F5` 刷新目标页面。
 
 ## Tampermonkey 脚本
 
 1. 安装 Tampermonkey。
-2. 新建脚本。
-3. 粘贴 `extension\tampermonkey-script\ai-media-extractor.user.js` 的完整内容并保存。
+2. 新建脚本并删除默认内容。
+3. 粘贴 `extension\tampermonkey-script\ai-media-extractor.user.js` 的完整内容，保存。
 4. 刷新豆包或千问页面，点击右下角素材按钮。
 
-## 常见问题
+## 代理设置
 
-- 豆包视频：请在浏览器登录豆包后使用扩展。无水印回退接口由平台控制，未返回可用地址时不会降级下载带水印流。
-- 千问视频：确认聊天页面中视频已经显示并完成加载，再打开素材面板。
-- 更新扩展或脚本后：重新加载扩展或保存脚本，再使用 `Ctrl + F5` 刷新页面。
+程序会读取 Windows 系统代理。若仍无法访问目标平台，可在启动服务前运行：
+
+```powershell
+$env:HTTPS_PROXY = "http://127.0.0.1:7890"
+$env:HTTP_PROXY = "http://127.0.0.1:7890"
+```
+
+请替换为实际代理端口。
+
+## 说明
+
+- 豆包视频的无水印地址由平台回退接口返回，浏览器扩展需要使用你的已登录会话；接口不可用时不会改为下载已知带水印流。
+- 千问视频从已加载的视频播放器中读取地址。请等待视频卡片显示完成后再打开素材面板。
+- 本地 API、扩展和脚本的支持范围见 [README.md](README.md)。
+
+## 来源与许可
+
+本项目基于 [ihmily/doubao-nomark](https://github.com/ihmily/doubao-nomark) 的 MIT 许可证代码进行修改与重构。请保留项目中的 [LICENSE](LICENSE)。
+
+**注意**：使用本服务时请遵守豆包、千问等目标平台的使用条款、内容权利和相关法律法规。请仅处理你有权访问、保存或使用的内容。

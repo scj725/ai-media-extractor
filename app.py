@@ -62,9 +62,9 @@ async def root():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
     return {
-        "message": "Doubao Parser - Extract images and videos from Doubao links",
+        "message": "AI Media Extractor",
         "docs": "/docs",
-        "version": "1.0.4",
+        "version": "0.1.0",
     }
 
 
@@ -114,7 +114,7 @@ async def parse_doubao_get(url: str, return_raw: bool = False):
         raise HTTPException(status_code=500, detail="图片解析失败，请检查链接是否正确")
 
 
-@app.post("/parse-video", summary="解析豆包|云雀视频")
+@app.post("/parse-video", summary="解析豆包|千问|云雀视频")
 async def parse_video(request: VideoRequest):
     try:
         url_str = str(request.url)
@@ -138,7 +138,7 @@ async def parse_video(request: VideoRequest):
         raise HTTPException(status_code=500, detail="视频解析失败，请检查链接是否正确")
 
 
-@app.get("/parse-video", summary="解析豆包|云雀视频(GET)")
+@app.get("/parse-video", summary="解析豆包|千问|云雀视频(GET)")
 async def parse_video_get(url: str, return_raw: bool = False):
     try:
         if "doubao.com" in url:
