@@ -1,0 +1,173 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 素材提取器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 300px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            color: #1f1f1f;
+        }
+
+        .header {
+            padding: 20px 20px 16px;
+            text-align: center;
+            background: linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%);
+            border-bottom: 1px solid #e4e6f5;
+        }
+
+        .header-icon {
+            font-size: 30px;
+            margin-bottom: 7px;
+        }
+
+        .header h1 {
+            font-size: 17px;
+            font-weight: 700;
+            color: #1f1f1f;
+            margin-bottom: 3px;
+        }
+
+        .header-sub {
+            font-size: 12px;
+            color: #8b8b8b;
+        }
+
+        .body {
+            padding: 16px 16px 12px;
+        }
+
+        .steps {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            background: #fafafa;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+        }
+
+        .step-num {
+            min-width: 20px;
+            height: 20px;
+            background: #1f1f1f;
+            color: #ffffff;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .step-text {
+            font-size: 13px;
+            color: #3b3b3b;
+            line-height: 1.4;
+        }
+
+        .step-text strong {
+            color: #1f1f1f;
+        }
+
+        .github-wrap {
+            text-align: center;
+            margin-top: 14px;
+        }
+
+        .link-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 16px;
+            background: #f7f7f7;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            color: #1f1f1f;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .link-button:hover {
+            background: #ffffff;
+            border-color: #1f1f1f;
+        }
+
+        .link-button svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-top: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+
+        .footer-text {
+            font-size: 12px;
+            color: #b0b0b0;
+        }
+
+        .header-version {
+            font-size: 12px;
+            font-weight: 400;
+            color: #b0b0b0;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-icon">📷</div>
+        <h1>AI 素材提取器<span class="header-version">v0.1.0</span></h1>
+        <p class="header-sub">无水印图片/视频提取工具</p>
+    </div>
+
+    <div class="body">
+        <ul class="steps">
+            <li class="step">
+                <span class="step-num">1</span>
+                <span class="step-text">访问<strong>豆包</strong>或<strong>千问</strong>对话页面</span>
+            </li>
+            <li class="step">
+                <span class="step-num">2</span>
+                <span class="step-text">使用AI生成图片或视频，插件自动解析出无水印的图片/视频</span>
+            </li>
+            <li class="step">
+                <span class="step-num">3</span>
+                <span class="step-text">点击右下角 📷 按钮查看并下载素材</span>
+            </li>
+        </ul>
+
+    </div>
+
+    <div class="footer">
+        <span class="footer-text">AI 素材提取器</span>
+    </div>
+</body>
+</html>
