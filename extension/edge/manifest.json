@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Media Extractor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Extract media assets from supported AI chat and share pages.",
   "icons": {
     "16": "icons/icon16.png",
@@ -52,5 +52,5 @@
       "128": "icons/icon128.png"
     }
   },
-  "homepage_url": ""
+  "homepage_url": "https://github.com/scj725/ai-media-extractor"
 }
