@@ -1,55 +1,19 @@
-﻿// ==UserScript==
-// @name         AI 素材提取器 - 素材提取
-// @namespace    http://tampermonkey.net/
-// @version      0.1.1
-// @description  在豆包对话页面提取无水印图片/视频，支持一键下载
-// @description:en Extract watermark-free images/videos from Doubao chat pages with one-click download
-// @author       Local maintainer
-// @homepage     https://github.com/scj725/ai-media-extractor
-// @supportURL   https://github.com/scj725/ai-media-extractor/issues
-// @updateURL    https://raw.githubusercontent.com/scj725/ai-media-extractor/main/extension/tampermonkey-script/ai-media-extractor.user.js
-// @downloadURL  https://raw.githubusercontent.com/scj725/ai-media-extractor/main/extension/tampermonkey-script/ai-media-extractor.user.js
-// @match        https://www.doubao.com/thread/*
-// @match        https://www.doubao.com/chat/*
-// @match        https://www.qianwen.com/chat/*
-// @match        https://www.qianwen.com/share/chat/*
-// @match        https://qianwen.my.cn/share/chat/*
-// @grant        GM_download
-// @grant        unsafeWindow
-// @connect      *
-// @license      MIT
-// @run-at       document-end
-// @icon         data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%221em%22%20height%3D%221em%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M0%200h24v24H0z%22%20fill%3D%22none%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%3E%3Cpath%20d%3D%22M2.5%2013.5v-7h19v7c0%203.771%200%205.657-1.172%206.828S17.272%2021.5%2013.5%2021.5h-3c-3.771%200-5.657%200-6.828-1.172S2.5%2017.271%202.5%2013.5m0-7l.6-.8c1.178-1.57%201.767-2.355%202.611-2.778C6.556%202.5%207.537%202.5%209.5%202.5h5c1.963%200%202.944%200%203.789.422c.845.423%201.433%201.208%202.611%202.778l.6.8%22%2F%3E%3Cpath%20d%3D%22M15%2014.5s-2.21%203-3%203s-3-3-3-3m3%202.5v-6.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E
-// ==/UserScript==
-
-(function() {
+﻿(function() {
     'use strict';
 
     console.log('%c[AI 素材提取器] 脚本开始执行', 'color: #667eea; font-size: 14px; font-weight: bold');
-    const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
-    const NativeReadableStream = pageWindow.ReadableStream || ReadableStream;
-    const NativeResponse = pageWindow.Response || Response;
-    console.log('[AI 素材提取器] 当前 URL:', pageWindow.location.href);
+    console.log('[AI 素材提取器] 当前 URL:', window.location.href);
 
     let chatImages = [];
     let chatVideos = [];
     let floatingBtnElement = null;
-    let mountObserver = null;
-
-    const MEDIA_EXTRACTOR_BUTTON_HOST_ID = 'ai-media-extractor-button-host';
-    const MEDIA_EXTRACTOR_ICON_SVG = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
-            <path d="M0 0h24v24H0z" fill="none" />
-            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
-                <path d="M2.5 13.5v-7h19v7c0 3.771 0 5.657-1.172 6.828S17.272 21.5 13.5 21.5h-3c-3.771 0-5.657 0-6.828-1.172S2.5 17.271 2.5 13.5m0-7l.6-.8c1.178-1.57 1.767-2.355 2.611-2.778C6.556 2.5 7.537 2.5 9.5 2.5h5c1.963 0 2.944 0 3.789.422c.845.423 1.433 1.208 2.611 2.778l.6.8" />
-                <path d="M15 14.5s-2.21 3-3 3s-3-3-3-3m3 2.5v-6.5" />
-            </g>
-        </svg>
-    `;
-    const DBX_BUTTON_CLASS = 'flex shrink-0 items-center justify-center font-[400] whitespace-nowrap select-none [&_svg]:shrink-0 text-[16px] leading-[24px] gap-[4px] rounded-dbx-sm p-[4px] transition-colors duration-150 ease-out bg-transparent hover:bg-dbx-fill-trans-10-hover [&:is(:where(:is([aria-haspopup="dialog"],[aria-haspopup="menu"])[data-state="open"]:not([data-slot="alert-dialog-trigger"])),:where(:is([aria-haspopup="dialog"],[aria-haspopup="menu"])[data-state="open"]:not([data-slot="alert-dialog-trigger"])_*))]:bg-dbx-fill-trans-10-hover outline-transparent outline-none [&_svg:not([class*="size-"])]:size-[18px] [&_svg[data-dbx-name=button-caret]:not([class*="size-"])]:size-[12px] relative h-fit cursor-pointer text-(--dbx-text-primary)';
 
     function updateButtonCount() {
-        setButtonCount(chatImages.length + chatVideos.length);
+        if (!floatingBtnElement) return;
+        const countElement = floatingBtnElement.querySelector('.count');
+        if (!countElement) return;
+        const imgCount = chatImages.length;
+        countElement.textContent = imgCount + chatVideos.length;
     }
 
     function addChatVideo(videoInfo) {
@@ -60,32 +24,25 @@
         updateButtonCount();
     }
 
-    const originalXHROpen = pageWindow.XMLHttpRequest.prototype.open;
-    const originalXHRSend = pageWindow.XMLHttpRequest.prototype.send;
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    const originalXHRSend = XMLHttpRequest.prototype.send;
     
-    pageWindow.XMLHttpRequest.prototype.open = function(method, url, ...args) {
+    XMLHttpRequest.prototype.open = function(method, url, ...args) {
         this._url = url;
-        // console.log('[AI 素材提取器] XHR open:', method, url);
         return originalXHROpen.apply(this, [method, url, ...args]);
     };
     
-    pageWindow.XMLHttpRequest.prototype.send = function(...args) {
+    XMLHttpRequest.prototype.send = function(...args) {
         const url = this._url;
         this.addEventListener('load', function() {
             if (url && (url.includes('/im/chain/single'))) {
                 try {
                     const data = JSON.parse(this.responseText);
-                    // console.log('[AI 素材提取器] XHR 拦截到聊天接口数据:', data);
-                    // console.log('[AI 素材提取器] downlink_body 存在:', !!data?.downlink_body);
-                    // console.log('[AI 素材提取器] pull_singe_chain_downlink_body 存在:', !!data?.downlink_body?.pull_singe_chain_downlink_body);
-                    // console.log('[AI 素材提取器] messages 存在:', !!data?.downlink_body?.pull_singe_chain_downlink_body?.messages);
                     
                     const messages = data?.downlink_body?.pull_singe_chain_downlink_body?.messages;
                     if (messages && Array.isArray(messages)) {
                         console.log('[AI 素材提取器] 开始解析 messages，数量:', messages.length);
                         parseChatHistoryImages(messages);
-                    } else {
-                        console.warn('[AI 素材提取器] messages 不是数组或不存在');
                     }
                 } catch (e) {
                     console.error('[AI 素材提取器] XHR 解析聊天数据失败:', e);
@@ -97,10 +54,10 @@
     
     console.log('[AI 素材提取器] XHR 拦截已安装');
 
-    const originalFetch = pageWindow.fetch;
-    pageWindow.fetch = async function(...args) {
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
         const url = args[0];
-
+        
         if (url && (typeof url === 'string') && url.includes('qianwen.com/api/v1/session/msg/list')) {
             console.log('[AI 素材提取器] 检测到千问 session msg list 请求:', url);
             const response = await originalFetch.apply(this, args);
@@ -134,7 +91,7 @@
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
-            const stream = new NativeReadableStream({
+            const stream = new ReadableStream({
                 async start(controller) {
                     let buffer = '';
                     let waitingForData = false;
@@ -169,7 +126,7 @@
                 }
             });
             
-            return new NativeResponse(stream, {
+            return new Response(stream, {
                 headers: response.headers,
                 status: response.status,
                 statusText: response.statusText
@@ -177,20 +134,19 @@
         }
         
         if (url && url.includes('/chat/completion')) {
-            console.log('[AI 素材提取器] ✨ 检测到 EventStream 请求:', url);
+            console.log('[AI 素材提取器] 检测到 EventStream 请求:', url);
             
             const response = await originalFetch.apply(this, args);
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
-            const stream = new NativeReadableStream({
+            const stream = new ReadableStream({
                 async start(controller) {
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
                         
                         const chunk = decoder.decode(value, { stream: true });
-                        // console.log('[AI 素材提取器] 收到数据块:', chunk.substring(0, 100));
                         
                         const lines = chunk.split('\n');
                         for (const line of lines) {
@@ -205,18 +161,18 @@
                                     }
                                 } catch (e) {
                                     console.log('[AI 素材提取器] 解析行失败:', e.message);
+                                    console.log('[AI 素材提取器] 解析行失败:', line);
                                 }
                             }
                         }
                         
-                        // 传递数据给原始响应
                         controller.enqueue(value);
                     }
                     controller.close();
                 }
             });
             
-            return new NativeResponse(stream, {
+            return new Response(stream, {
                 headers: response.headers,
                 status: response.status,
                 statusText: response.statusText
@@ -257,6 +213,7 @@
         }
     }
 
+    
     function parseStreamChunk(data) {
         try {
             if (!data.event_data && !data.patch_op) {
@@ -345,7 +302,6 @@
             
             for (const creation of creations) {
                 if (creation?.video) {
-                    // Handle video
                     const vid = creation.video.vid;
                     getDoubaoVideoInfo(vid).then(info => addChatVideo(info));
                 }else{
@@ -371,6 +327,8 @@
                     }
                 }
             }
+            
+            console.log('[AI 素材提取器][千问] 聊天界面，返回已缓存的', chatImages.length, '张图片');
         } catch (e) {
             console.error('[AI 素材提取器] 解析 StreamChunk 失败:', e);
         }
@@ -457,7 +415,7 @@
 
     function dbFallbackApi(vid) {
         const pattern = /fallback_api.*?(https:.*?)(?:\\+&quot;|&quot;|")/gs;
-        for (const match of pageWindow.document.documentElement.innerHTML.matchAll(pattern)) {
+        for (const match of document.documentElement.innerHTML.matchAll(pattern)) {
             const value = match[1].replace(/&amp;/g, '&').replace(/\\u002F/gi, '/').replace(/\\\//g, '/');
             if (value.includes(vid)) return value;
         }
@@ -470,21 +428,39 @@
         if (direct || !token.startsWith('qAAB') || !keySeed) return direct;
         const encrypted = dbTokenBytes(token), seed = dbTokenBytes(keySeed);
         if (!encrypted || !seed) return '';
-        const seedHash = new Uint8Array(await pageWindow.crypto.subtle.digest('SHA-512', seed.slice(0, 32)));
+        const seedHash = new Uint8Array(await crypto.subtle.digest('SHA-512', seed.slice(0, 32)));
         const mixed = new Uint8Array(seedHash.length + DB_QAAB_SALT.length); mixed.set(seedHash); mixed.set(DB_QAAB_SALT, seedHash.length);
-        const derived = new Uint8Array(await pageWindow.crypto.subtle.digest('SHA-512', mixed));
+        const derived = new Uint8Array(await crypto.subtle.digest('SHA-512', mixed));
         const keyA = derived.slice(0, 16), keyB = derived.slice(16, 32);
         const attempts = [[encrypted.slice(4), keyA, keyB], [encrypted.slice(4), keyB, keyA]];
         if (encrypted.length > 36) attempts.push([encrypted.slice(36), keyA, encrypted.slice(20, 36)], [encrypted.slice(36), keyA, keyB]);
         for (const [data, key, iv] of attempts) {
             if (!data.length || data.length % 16) continue;
             try {
-                const cryptoKey = await pageWindow.crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['decrypt']);
-                const url = dbUrlFromBytes(new Uint8Array(await pageWindow.crypto.subtle.decrypt({ name: 'AES-CBC', iv }, cryptoKey, data)));
+                const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['decrypt']);
+                const url = dbUrlFromBytes(new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, cryptoKey, data)));
                 if (url) return url;
             } catch (_) { /* Try the next recognized qAAB key/IV form. */ }
         }
         return '';
+    }
+
+    function dbFetchFallback(url) {
+        return new Promise((resolve, reject) => {
+            const id = `db-fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const onResponse = event => {
+                if (event.detail?.id !== id) return;
+                window.removeEventListener('ai-media-extractor-fallback-response', onResponse);
+                if (!event.detail.ok) { reject(new Error(event.detail.error || 'Fallback request failed.')); return; }
+                resolve(event.detail.data);
+            };
+            window.addEventListener('ai-media-extractor-fallback-response', onResponse);
+            window.dispatchEvent(new CustomEvent('ai-media-extractor-fallback-request', { detail: { id, url } }));
+            setTimeout(() => {
+                window.removeEventListener('ai-media-extractor-fallback-response', onResponse);
+                reject(new Error('Fallback request timed out.'));
+            }, 15000);
+        });
     }
 
     async function getDoubaoVideoInfo(vid) {
@@ -493,8 +469,7 @@
         try {
             const apiUrl = new URL(fallbackApi);
             apiUrl.searchParams.set('channel', 'no'); apiUrl.searchParams.set('codec_type', '8'); apiUrl.searchParams.set('logo_type', 'unwatermarked');
-            // Doubao wraps fetch and expects a string URL rather than a URL object.
-            const result = await (await pageWindow.fetch(apiUrl.href, { credentials: 'include', headers: { accept: 'application/json,text/plain,*/*' } })).json();
+            const result = await dbFetchFallback(apiUrl.href);
             const data = result?.video_info?.data || result?.data?.video_info?.data || result?.video_info || result?.data || result;
             const video = Object.values(data?.video_list || {}).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0] || data;
             const url = await dbDecodeUrl(video?.main_url || video?.play_url || '', data?.key_seed || result?.key_seed || '');
@@ -637,7 +612,7 @@
     function extractQianwenMyShareImages() {
         const images = [];
         const seen = new Set();
-        pageWindow.document.querySelectorAll('img[data-image-resource-id], img[src*="workspace-zb-cdn.qianwen.com"]').forEach((img) => {
+        document.querySelectorAll('img[data-image-resource-id], img[src*="workspace-zb-cdn.qianwen.com"]').forEach((img) => {
             const url = img.currentSrc || img.src;
             if (!url || seen.has(url) || !/\.(png|jpe?g|webp)(\?|$)/i.test(url)) return;
             seen.add(url);
@@ -649,7 +624,7 @@
     function extractQianwenMyShareVideos() {
         const videos = [];
         const seen = new Set();
-        pageWindow.document.querySelectorAll('video').forEach((video, index) => {
+        document.querySelectorAll('video').forEach((video, index) => {
             const url = video.currentSrc || video.src;
             if (!url || seen.has(url) || !/\.(mp4|webm|mov)(\?|$)/i.test(url)) return;
             seen.add(url);
@@ -663,15 +638,14 @@
     }
 
     function extractImages() {
-        if (pageWindow.location.hostname === 'qianwen.my.cn' && pageWindow.location.pathname.includes('/share/chat/')) {
+        if (window.location.hostname === 'qianwen.my.cn' && window.location.pathname.includes('/share/chat/')) {
             chatImages = extractQianwenMyShareImages();
             return chatImages;
         }
-        
-        if (pageWindow.location.hostname.includes('doubao.com') && pageWindow.location.pathname.includes('/chat/')) {
+        if (window.location.hostname.includes('doubao.com') && window.location.pathname.includes('/chat/')) {
             console.log('[AI 素材提取器] 豆包聊天界面，返回已缓存的', chatImages.length, '张图片');
             return chatImages;
-        } else if (pageWindow.location.hostname.includes('qianwen.com') && pageWindow.location.pathname.includes('/chat/')) {
+        } else if (window.location.hostname.includes('qianwen.com') && window.location.pathname.includes('/chat/')) {
             return chatImages;
         }else{
             const images = extractSharePageImages();
@@ -682,8 +656,8 @@
     }
 
     function extractVideos() {
-        if ((pageWindow.location.hostname === 'qianwen.my.cn' && pageWindow.location.pathname.includes('/share/chat/')) ||
-            (pageWindow.location.hostname.includes('qianwen.com') && pageWindow.location.pathname.includes('/chat/'))) {
+        if ((window.location.hostname === 'qianwen.my.cn' && window.location.pathname.includes('/share/chat/')) ||
+            (window.location.hostname.includes('qianwen.com') && window.location.pathname.includes('/chat/'))) {
             chatVideos = extractQianwenMyShareVideos();
             return chatVideos;
         }
@@ -691,216 +665,32 @@
         return chatVideos;
     }
 
-    function createDownloadTask(url, filename) {
-        let settled = false;
-        let rejectDownload = null;
-        let abortDownload = null;
-
-        const promise = new Promise((resolve, reject) => {
-            rejectDownload = reject;
-
-            const finish = () => {
-                if (settled) return;
-                settled = true;
-                console.log('[AI 素材提取器] 下载完成:', filename);
-                resolve();
-            };
-
-            const fail = (error) => {
-                if (settled) return;
-                settled = true;
-                console.error('[AI 素材提取器] 下载失败:', error);
-                reject(error);
-            };
-
-            console.log('[AI 素材提取器] 开始下载:', url);
-
-            if (typeof GM_download === 'function') {
-                try {
-                    const download = GM_download({
-                        url,
-                        name: filename,
-                        saveAs: false,
-                        onload: finish,
-                        onerror: fail,
-                        ontimeout: () => fail(new Error('下载超时')),
-                    });
-
-                    if (download && typeof download.abort === 'function') {
-                        abortDownload = () => download.abort();
-                    }
-                } catch (error) {
-                    fail(error);
-                }
-                return;
-            }
-
-            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-            abortDownload = () => controller?.abort();
-
-            fetch(url, { signal: controller?.signal })
-                .then(response => response.blob())
-                .then(blob => {
-                    const blobUrl = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = blobUrl;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-                    finish();
-                })
-                .catch(fail);
-        });
-
-        return {
-            promise,
-            abort() {
-                if (settled) return;
-                settled = true;
-                try {
-                    if (abortDownload) abortDownload();
-                } catch (error) {
-                    console.warn('[AI 素材提取器] 取消下载失败:', error);
-                }
-                rejectDownload(new Error('下载已取消'));
-            },
-        };
-    }
-
     async function downloadImage(url, filename) {
         try {
-            await createDownloadTask(url, filename).promise;
-            return true;
+            console.log('[AI 素材提取器] 开始下载:', url);
+            
+            const response = await fetch(url);
+            const blob = await response.blob();
+            
+            const blobUrl = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+            
+            console.log('[AI 素材提取器] 下载完成:', filename);
         } catch (error) {
-            if (error?.message === '下载已取消') return false;
+            console.error('[AI 素材提取器] 下载失败:', error);
             alert('下载失败，请重试');
-            return false;
         }
-    }
-
-    function getMediaExtension(url, type) {
-        try {
-            const pathname = new URL(url, pageWindow.location.href).pathname;
-            const match = pathname.match(/\.([a-z0-9]{2,5})$/i);
-            if (match) return `.${match[1].toLowerCase()}`;
-        } catch (e) {
-            // Ignore malformed URLs and fall back to a safe default extension.
-        }
-        return type === 'video' ? '.mp4' : '.png';
-    }
-
-    function getDownloadFilename(type, index, url) {
-        const prefix = type === 'video' ? 'doubao_video' : 'doubao_image';
-        return `${prefix}_${index + 1}${getMediaExtension(url, type)}`;
-    }
-
-    function isOwnElement(el) {
-        if (!el) return false;
-        return Boolean(el.closest && (
-            el.closest(`#${MEDIA_EXTRACTOR_BUTTON_HOST_ID}`) ||
-            el.closest('#ai-media-extractor-modal')
-        ));
-    }
-
-    function isVisible(el) {
-        if (!el || !el.isConnected || isOwnElement(el)) return false;
-        const style = window.getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
-            return false;
-        }
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0
-            && rect.top < window.innerHeight && rect.left < window.innerWidth;
-    }
-
-    function findTopBarMount() {
-        const headerLeftButton = Array.from(document.querySelectorAll('button[data-dbx-name="button"]')).find(button => {
-            if (!isVisible(button)) return false;
-
-            const container = button.parentElement;
-            if (!container || !container.matches('div.flex-row.flex')) return false;
-
-            const className = String(container.className || '');
-            if (!className.includes('gap-8')) return false;
-            if (!className.includes('overflow-hidden') && !className.includes('pl-g-header-left-padding')) return false;
-
-            const rect = container.getBoundingClientRect();
-            return rect.top < 100 && rect.height > 20 && rect.height < 80;
-        });
-
-        return headerLeftButton?.parentElement || null;
-    }
-
-    function getNomarkButtonHost() {
-        return document.getElementById(MEDIA_EXTRACTOR_BUTTON_HOST_ID) ||
-            floatingBtnElement?.closest(`#${MEDIA_EXTRACTOR_BUTTON_HOST_ID}`) ||
-            null;
-    }
-
-    function mountNomarkButtonHost() {
-        const buttonHost = getNomarkButtonHost();
-        if (!buttonHost || !document.body) return;
-
-        const mount = findTopBarMount();
-        if (mount) {
-            mount.classList.remove('overflow-hidden');
-            mount.style.overflow = 'visible';
-
-            const nativeButtons = Array.from(mount.children).filter(child => {
-                return child.matches?.('button[data-dbx-name="button"]') && !isOwnElement(child);
-            });
-            const anchor = nativeButtons[nativeButtons.length - 1];
-            const nextNode = anchor?.nextSibling || null;
-
-            if (buttonHost.parentElement !== mount || buttonHost.previousSibling !== anchor) {
-                mount.insertBefore(buttonHost, nextNode);
-            }
-            buttonHost.classList.remove('fallback');
-            return;
-        }
-
-        if (buttonHost.parentElement !== document.body) {
-            document.body.appendChild(buttonHost);
-        }
-        buttonHost.classList.add('fallback');
-    }
-
-    function startMountObserver() {
-        if (mountObserver || !document.documentElement) return;
-
-        mountObserver = new MutationObserver(() => {
-            const buttonHost = getNomarkButtonHost();
-            const mount = findTopBarMount();
-            if (mount) {
-                mount.classList.remove('overflow-hidden');
-                mount.style.overflow = 'visible';
-            }
-            if (!buttonHost || !buttonHost.isConnected || buttonHost.classList.contains('fallback')) {
-                mountNomarkButtonHost();
-            }
-        });
-        mountObserver.observe(document.documentElement, { childList: true, subtree: true });
-    }
-
-    function setButtonCount(count) {
-        if (!floatingBtnElement) return;
-        const countElement = floatingBtnElement.querySelector('.count');
-        if (!countElement) return;
-
-        const totalCount = Number(count) || 0;
-        countElement.textContent = String(totalCount);
-        countElement.classList.toggle('show', totalCount > 0);
     }
 
     function createFloatingButton() {
-        // The browser extension and userscript share the page. Reuse the first
-        // mounted UI instead of binding to another implementation's DOM.
-        if (document.getElementById('ai-media-extractor-btn') || document.getElementById('ai-media-extractor-modal')) {
-            console.warn('[AI 素材提取器] 页面中已有素材面板，跳过重复注入');
-            return;
-        }
         const button = document.createElement('div');
         button.innerHTML = `
             <style>
@@ -908,71 +698,46 @@
                     box-sizing: border-box;
                 }
                 
-                #${MEDIA_EXTRACTOR_BUTTON_HOST_ID} {
-                    position: relative;
-                    z-index: 2147483646;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                    line-height: 1;
-                    overflow: visible;
-                    color: var(--dbx-text-primary, currentColor);
-                }
-
-                #${MEDIA_EXTRACTOR_BUTTON_HOST_ID}.fallback {
+                #ai-media-extractor-btn {
                     position: fixed;
                     right: 24px;
                     bottom: 24px;
-                }
-
-                #${MEDIA_EXTRACTOR_BUTTON_HOST_ID}.fallback #ai-media-extractor-btn {
+                    z-index: 9999;
                     width: 48px;
                     height: 48px;
                     background: #ffffff;
                     border: 1px solid #e0e0e0;
                     border-radius: 8px;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                    cursor: pointer;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     font-size: 20px;
-                    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
                 }
-
-                #${MEDIA_EXTRACTOR_BUTTON_HOST_ID}.fallback #ai-media-extractor-btn:hover {
+                
+                #ai-media-extractor-btn:hover {
                     border-color: #1f1f1f;
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-                }
-
-                #ai-media-extractor-btn {
-                    overflow: visible;
-                    color: var(--dbx-text-primary, currentColor);
                 }
                 
                 #ai-media-extractor-btn .count {
                     position: absolute;
-                    top: -7px;
+                    top: -6px;
                     right: -6px;
-                    z-index: 1;
-                    display: none;
-                    min-width: 13px;
-                    height: 13px;
-                    padding: 0 3px;
-                    background: #ff4d4f;
+                    min-width: 20px;
+                    height: 20px;
+                    padding: 0 6px;
+                    background: #1f1f1f;
                     color: #ffffff;
-                    border-radius: 999px;
-                    font: 600 8px/13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    border-radius: 10px;
+                    font-size: 11px;
                     font-weight: 600;
+                    display: flex;
                     align-items: center;
                     justify-content: center;
-                    text-align: center;
-                    pointer-events: none;
-                    box-shadow: 0 0 0 1.5px var(--dbx-bg-base, #ffffff);
-                }
-
-                #ai-media-extractor-btn .count.show {
-                    display: flex;
+                    line-height: 1;
                 }
                 
                 #ai-media-extractor-modal {
@@ -1001,16 +766,14 @@
                 .modal-content {
                     background: #ffffff;
                     border-radius: 12px;
-                    width: 888px;
-                    max-width: calc(100vw - 48px);
+                    width: 90%;
+                    max-width: 1000px;
                     max-height: 85vh;
                     display: flex;
                     flex-direction: column;
                     overflow: hidden;
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
                     animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-                    font-size: 12px;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 }
                 
                 @keyframes slideUp {
@@ -1024,50 +787,37 @@
                     }
                 }
                 
-                .modal-topbar {
-                    padding: 10px 20px 0;
+                .modal-header {
+                    padding: 24px 32px;
                     border-bottom: 1px solid #e0e0e0;
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    gap: 12px;
                 }
-
-                .modal-actions {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    margin-bottom: 8px;
-                }
-
-                .top-action-btn {
-                    height: 26px;
-                    padding: 0 8px;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 6px;
-                    background: #ffffff;
+                
+                .modal-header h3 {
+                    margin: 0;
+                    font-size: 18px;
+                    font-weight: 600;
                     color: #1f1f1f;
-                    font-size: 12px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    white-space: nowrap;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 }
-
-                .top-action-btn:hover {
-                    background: #f7f7f7;
-                    border-color: #1f1f1f;
+                
+                .modal-header .subtitle {
+                    font-size: 13px;
+                    color: #6b6b6b;
+                    margin-top: 4px;
+                    font-weight: 400;
                 }
-
-                .top-action-btn.danger {
-                    background: #fff7ed;
-                    border-color: #fdba74;
-                    color: #9a3412;
+                
+                .modal-header-left {
+                    display: flex;
+                    flex-direction: column;
                 }
-
+                
                 .close-btn {
-                    width: 26px;
-                    height: 26px;
+                    width: 32px;
+                    height: 32px;
                     background: transparent;
                     border: 1px solid #e0e0e0;
                     border-radius: 6px;
@@ -1076,7 +826,7 @@
                     align-items: center;
                     justify-content: center;
                     color: #6b6b6b;
-                    font-size: 12px;
+                    font-size: 20px;
                     transition: all 0.2s ease;
                     line-height: 1;
                 }
@@ -1088,41 +838,9 @@
                 }
                 
                 .modal-body {
-                    padding: 16px 20px;
+                    padding: 24px 32px;
                     overflow-y: auto;
                     flex: 1;
-                }
-
-                .media-tabs {
-                    display: flex;
-                    gap: 8px;
-                    padding: 0;
-                    background: #ffffff;
-                }
-
-                .media-tab {
-                    padding: 6px 12px;
-                    border: 1px solid #e0e0e0;
-                    border-bottom-color: transparent;
-                    border-radius: 8px 8px 0 0;
-                    background: #f7f7f7;
-                    color: #6b6b6b;
-                    font-size: 12px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-
-                .media-tab:hover {
-                    color: #1f1f1f;
-                    background: #ffffff;
-                }
-
-                .media-tab.active {
-                    color: #1f1f1f;
-                    background: #ffffff;
-                    border-color: #d0d0d0;
-                    box-shadow: 0 -1px 0 #ffffff inset;
                 }
                 
                 .modal-body::-webkit-scrollbar {
@@ -1143,12 +861,12 @@
                 }
                 
                 .media-grid {
-                    --media-card-width: 160px;
-                    --media-preview-height: 160px;
+                    --media-card-width: 220px;
+                    --media-preview-height: 220px;
                     display: grid;
-                    grid-template-columns: repeat(5, var(--media-card-width));
+                    grid-template-columns: repeat(auto-fill, minmax(var(--media-card-width), var(--media-card-width)));
                     justify-content: start;
-                    gap: 12px;
+                    gap: 16px;
                 }
 
                 .media-card {
@@ -1167,12 +885,10 @@
                 }
 
                 .media-preview {
-                    position: relative;
                     width: 100%;
                     height: var(--media-preview-height);
                     display: block;
                     background: #000;
-                    cursor: pointer;
                 }
 
                 .media-preview video {
@@ -1183,67 +899,11 @@
                     background: #000;
                 }
 
-                .video-click-zone {
-                    position: absolute;
-                    left: 0;
-                    width: 100%;
-                    height: 50%;
-                    z-index: 2;
-                }
-
-                .video-click-top {
-                    top: 0;
-                    cursor: pointer;
-                }
-
-                .video-click-bottom {
-                    bottom: 0;
-                    cursor: pointer;
-                }
-
-                .video-control-overlay {
-                    position: absolute;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 6px;
-                    min-height: 34px;
-                    padding: 6px;
-                    background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
-                    color: #ffffff;
-                    opacity: 0;
-                    transform: translateY(4px);
-                    transition: opacity 0.16s ease, transform 0.16s ease;
-                    pointer-events: none;
-                }
-
-                .video-click-bottom:hover .video-control-overlay {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-
-                .video-play-indicator {
-                    width: 26px;
-                    height: 26px;
-                    border-radius: 999px;
-                    background: rgba(255, 255, 255, 0.88);
-                    color: #111111;
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 12px;
-                    font-weight: 700;
-                    line-height: 1;
-                }
-
                 .video-meta {
                     display: flex;
                     flex-wrap: wrap;
-                    gap: 6px;
-                    padding: 6px 8px;
+                    gap: 8px;
+                    padding: 8px 10px;
                     font-size: 12px;
                     color: #6b6b6b;
                     background: #ffffff;
@@ -1258,9 +918,8 @@
 
                 .video-actions {
                     display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    padding: 8px;
+                    gap: 8px;
+                    padding: 10px;
                     background: #ffffff;
                     border-top: 1px solid #e0e0e0;
                 }
@@ -1276,10 +935,10 @@
                     position: absolute;
                     top: 8px;
                     right: 8px;
-                    padding: 3px 6px;
+                    padding: 4px 8px;
                     background: rgba(0, 0, 0, 0.6);
                     border-radius: 4px;
-                    font-size: 12px;
+                    font-size: 11px;
                     color: #ffffff;
                     font-weight: 500;
                     opacity: 0;
@@ -1291,25 +950,17 @@
                 }
                 
                 .action-btn {
-                    flex: 0 0 auto;
-                    min-width: 52px;
-                    padding: 6px 10px;
+                    flex: 1;
+                    padding: 6px 12px;
                     border: 1px solid #e0e0e0;
                     border-radius: 4px;
                     background: #ffffff;
                     color: #1f1f1f;
-                    font-size: 12px;
+                    font-size: 13px;
                     font-weight: 500;
                     cursor: pointer;
                     transition: all 0.2s ease;
-                }
-
-                .media-select {
-                    width: 14px;
-                    height: 14px;
-                    margin: 0 0 0 auto;
-                    accent-color: #1f1f1f;
-                    cursor: pointer;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 }
                 
                 .action-btn:hover {
@@ -1325,7 +976,7 @@
                 
                 .empty-state {
                     text-align: center;
-                    padding: 56px 20px;
+                    padding: 80px 20px;
                     color: #a0a0a0;
                 }
                 
@@ -1336,24 +987,24 @@
                 }
                 
                 .empty-state-text {
-                    font-size: 12px;
+                    font-size: 15px;
                     color: #6b6b6b;
                     font-weight: 500;
                 }
                 
                 .empty-state-desc {
-                    font-size: 12px;
+                    font-size: 13px;
                     color: #a0a0a0;
                     margin-top: 4px;
                 }
                 
                 .modal-footer {
-                    padding: 8px 20px;
+                    padding: 16px 32px;
                     border-top: 1px solid #e0e0e0;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    gap: 8px;
+                    gap: 12px;
                     background: #fafafa;
                 }
                 
@@ -1365,7 +1016,8 @@
                 
                 .footer-text {
                     color: #a0a0a0;
-                    font-size: 12px;
+                    font-size: 13px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 }
                 
                 .footer-link {
@@ -1374,8 +1026,9 @@
                     gap: 6px;
                     color: #6b6b6b;
                     text-decoration: none;
-                    font-size: 12px;
+                    font-size: 13px;
                     transition: all 0.15s ease;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 }
                 
                 .footer-link:hover {
@@ -1392,43 +1045,25 @@
                 .footer-link:hover svg {
                     opacity: 1;
                 }
-
-                @media (max-width: 920px) {
-                    .modal-content {
-                        width: calc(100vw - 24px);
-                    }
-
-                    .media-grid {
-                        grid-template-columns: repeat(auto-fill, minmax(var(--media-card-width), var(--media-card-width)));
-                    }
-                }
             </style>
-            <div id="${MEDIA_EXTRACTOR_BUTTON_HOST_ID}">
-                <button id="ai-media-extractor-btn" type="button" title="提取素材" aria-label="提取素材" data-disabled="false" data-loading="false" data-dbx-name="button" class='${DBX_BUTTON_CLASS}'>
-                    <div class="min-w-0 truncate">${MEDIA_EXTRACTOR_ICON_SVG}</div>
-                    <div class="absolute inset-[-6px] opacity-0"></div>
-                    <span class="count" aria-live="polite">0</span>
-                </button>
+            <div id="ai-media-extractor-btn" title="提取素材">
+                📷
+                <span class="count">0</span>
             </div>
             <div id="ai-media-extractor-modal">
                 <div class="modal-content">
-                    <div class="modal-topbar">
-                        <div class="media-tabs" role="tablist" aria-label="素材类型">
-                            <button class="media-tab active" type="button" data-tab="image" role="tab" aria-selected="true">图片(0)</button>
-                            <button class="media-tab" type="button" data-tab="video" role="tab" aria-selected="false">视频(0)</button>
+                    <div class="modal-header">
+                        <div class="modal-header-left">
+                            <h3>素材提取器</h3>
+                            <div class="subtitle" id="image-subtitle">共 0 张图片</div>
                         </div>
-                        <div class="modal-actions">
-                            <button class="top-action-btn btn-select-all" type="button">全选</button>
-                            <button class="top-action-btn btn-clear-selection" type="button">取消选择</button>
-                            <button class="top-action-btn btn-batch-download" type="button">批量下载</button>
-                            <button class="close-btn" type="button">×</button>
-                        </div>
+                        <button class="close-btn">×</button>
                     </div>
                     <div class="modal-body">
                         <div class="media-grid" id="media-container"></div>
                     </div>
                     <div class="modal-footer">
-                        <span class="footer-text">本地脚本</span>
+                        <span class="footer-text">本地扩展</span>
                         <!--
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -1445,29 +1080,16 @@
 
         document.body.appendChild(button);
 
-        let modal = document.getElementById('ai-media-extractor-modal');
-        if (modal && modal.parentElement !== document.body) {
-            document.body.appendChild(modal);
-        }
-
         floatingBtnElement = document.getElementById('ai-media-extractor-btn');
-        mountNomarkButtonHost();
-        startMountObserver();
 
         const floatingBtn = floatingBtnElement;
+        const modal = document.getElementById('ai-media-extractor-modal');
         const closeBtn = modal.querySelector('.close-btn');
         const mediaContainer = document.getElementById('media-container');
-        const tabButtons = modal.querySelectorAll('.media-tab');
-        const selectAllBtn = modal.querySelector('.btn-select-all');
-        const clearSelectionBtn = modal.querySelector('.btn-clear-selection');
-        const batchDownloadBtn = modal.querySelector('.btn-batch-download');
+        const imageSubtitle = document.getElementById('image-subtitle');
 
         let currentImages = [];
         let currentVideos = [];
-        let activeTab = 'image';
-        let batchDownloading = false;
-        let batchCancelRequested = false;
-        let currentDownloadTask = null;
 
         function formatDuration(sec) {
             if (!sec || sec <= 0) return '';
@@ -1477,126 +1099,25 @@
             return `${m}:${r.toString().padStart(2, '0')}`;
         }
 
-        function updateTabLabels() {
-            tabButtons.forEach(btn => {
-                const isImageTab = btn.dataset.tab === 'image';
-                btn.textContent = isImageTab ? `图片(${currentImages.length})` : `视频(${currentVideos.length})`;
-                btn.classList.toggle('active', btn.dataset.tab === activeTab);
-                btn.setAttribute('aria-selected', btn.dataset.tab === activeTab ? 'true' : 'false');
-            });
-        }
-
         function updateImageCount() {
             const images = extractImages();
             const videos = extractVideos();
             currentImages = images;
             currentVideos = videos;
             const totalCount = images.length + videos.length;
-            setButtonCount(totalCount);
-            updateTabLabels();
+            floatingBtn.querySelector('.count').textContent = totalCount;
+            imageSubtitle.textContent = `共 ${images.length} 张图片 · ${videos.length} 个视频`;
             return { images, videos };
         }
 
-        function getMediaList(type = activeTab) {
-            return type === 'image' ? currentImages : currentVideos;
-        }
-
-        function getMediaItem(type, index) {
-            return getMediaList(type)[index] || null;
-        }
-
-        function clearAllSelections() {
-            mediaContainer.querySelectorAll('.media-select').forEach(input => {
-                input.checked = false;
-            });
-        }
-
-        function setCurrentTabSelection(checked) {
-            mediaContainer.querySelectorAll(`.media-select[data-type="${activeTab}"]`).forEach(input => {
-                input.checked = checked;
-            });
-        }
-
-        function getSelectedCurrentMediaItems() {
-            return Array.from(mediaContainer.querySelectorAll(`.media-select[data-type="${activeTab}"]:checked`))
-                .map(input => {
-                    const index = parseInt(input.dataset.index, 10);
-                    const data = getMediaItem(activeTab, index);
-                    return data ? { type: activeTab, index, data } : null;
-                })
-                .filter(Boolean);
-        }
-
-        function updateBatchButton() {
-            batchDownloadBtn.textContent = batchDownloading ? '取消下载' : '批量下载';
-            batchDownloadBtn.classList.toggle('danger', batchDownloading);
-        }
-
-        function cancelBatchDownload() {
-            if (!batchDownloading) return;
-            batchCancelRequested = true;
-            if (currentDownloadTask) {
-                currentDownloadTask.abort();
-            }
-        }
-
-        async function runBatchDownload() {
-            if (batchDownloading) {
-                cancelBatchDownload();
-                return;
-            }
-
-            const selectedItems = getSelectedCurrentMediaItems();
-            if (selectedItems.length === 0) {
-                alert('请先选择要下载的素材');
-                return;
-            }
-
-            batchDownloading = true;
-            batchCancelRequested = false;
-            updateBatchButton();
-
-            for (const item of selectedItems) {
-                if (batchCancelRequested) break;
-
-                const filename = getDownloadFilename(item.type, item.index, item.data.url);
-                currentDownloadTask = createDownloadTask(item.data.url, filename);
-
-                try {
-                    await currentDownloadTask.promise;
-                } catch (error) {
-                    if (batchCancelRequested || error?.message === '下载已取消') {
-                        break;
-                    }
-                    console.error('[AI 素材提取器] 批量下载单项失败:', error);
-                } finally {
-                    currentDownloadTask = null;
-                }
-            }
-
-            batchDownloading = false;
-            batchCancelRequested = false;
-            updateBatchButton();
-        }
-
-        function renderEmptyState(type) {
-            const isImage = type === 'image';
-            mediaContainer.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">${isImage ? '🖼️' : '🎬'}</div>
-                    <div class="empty-state-text">当前页面没有找到${isImage ? '图片' : '视频'}</div>
-                    <div class="empty-state-desc">可以切换到另一个标签查看已提取的素材</div>
-                </div>
-            `;
-        }
-
-        function renderMedia(type = activeTab) {
-            const mediaItems = type === 'image'
-                ? currentImages.map((image, index) => ({ type: 'image', data: image, index }))
-                : currentVideos.map((video, index) => ({ type: 'video', data: video, index }));
+        function renderMedia(images, videos) {
+            const mediaItems = [
+                ...images.map((image, index) => ({ type: 'image', data: image, index })),
+                ...videos.map((video, index) => ({ type: 'video', data: video, index })),
+            ];
 
             if (mediaItems.length === 0) {
-                renderEmptyState(type);
+                mediaContainer.innerHTML = '';
                 return;
             }
 
@@ -1611,12 +1132,12 @@
                                 ${resolution ? `<div class="image-info">${resolution}</div>` : ''}
                             </div>
                             <div class="video-meta">
-                                ${resolution ? `<span class="video-meta-item">${resolution}</span>` : ''}
+                                <span class="video-meta-item">🖼 图片</span>
+                                ${resolution ? `<span class="video-meta-item">📐 ${resolution}</span>` : ''}
                             </div>
                             <div class="video-actions">
-                                <button class="action-btn btn-media-download" data-type="image" data-index="${item.index}">下载</button>
-                                <button class="action-btn btn-media-copy" data-type="image" data-index="${item.index}">地址</button>
-                                <input class="media-select" type="checkbox" data-type="image" data-index="${item.index}" aria-label="选择图片 ${item.index + 1}">
+                                <button class="action-btn btn-media-download" data-type="image" data-url="${image.url}" data-index="${item.index}">下载</button>
+                                <button class="action-btn btn-media-copy" data-url="${image.url}">复制地址</button>
                             </div>
                         </div>
                     `;
@@ -1629,43 +1150,30 @@
                 return `
                     <div class="media-card">
                         <div class="media-preview">
-                            <video src="${video.url}" preload="none" playsinline${posterAttr}></video>
-                            <div class="video-click-zone video-click-top" data-index="${item.index}" aria-label="选择视频 ${item.index + 1}"></div>
-                            <div class="video-click-zone video-click-bottom" data-index="${item.index}" aria-label="播放或暂停视频 ${item.index + 1}">
-                                <div class="video-control-overlay">
-                                    <span class="video-play-indicator">▶</span>
-                                </div>
-                            </div>
+                            <video src="${video.url}" controls preload="none" playsinline${posterAttr}></video>
                         </div>
                         <div class="video-meta">
-                            ${resolution ? `<span class="video-meta-item">${resolution}</span>` : ''}
+                            <span class="video-meta-item">🎬 视频</span>
+                            ${resolution ? `<span class="video-meta-item">📐 ${resolution}</span>` : ''}
                             ${duration ? `<span class="video-meta-item">⏱ ${duration}</span>` : ''}
+                            ${video.definition ? `<span class="video-meta-item">清晰度 ${video.definition}</span>` : ''}
                         </div>
                         <div class="video-actions">
-                            <button class="action-btn btn-media-download" data-type="video" data-index="${item.index}">下载</button>
-                            <button class="action-btn btn-media-copy" data-type="video" data-index="${item.index}">地址</button>
-                            <input class="media-select" type="checkbox" data-type="video" data-index="${item.index}" aria-label="选择视频 ${item.index + 1}">
+                            <button class="action-btn btn-media-download" data-type="video" data-url="${video.url}" data-index="${item.index}">下载</button>
+                            <button class="action-btn btn-media-copy" data-url="${video.url}">复制地址</button>
                         </div>
                     </div>
                 `;
             }).join('');
 
             mediaContainer.querySelectorAll('.btn-media-download').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
+                btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const type = btn.dataset.type;
-                    const index = parseInt(btn.dataset.index, 10);
-                    const media = getMediaItem(type, index);
-                    if (!media) return;
-
-                    btn.textContent = '下载中';
-                    const filename = getDownloadFilename(type, index, media.url);
-                    const success = await downloadImage(media.url, filename);
-                    if (!success) {
-                        btn.textContent = '下载';
-                        return;
-                    }
-
+                    const url = btn.dataset.url;
+                    const index = parseInt(btn.dataset.index, 10) + 1;
+                    const filename = type === 'video' ? `ai_media_video_${index}.mp4` : `ai_media_image_${index}.png`;
+                    downloadImage(url, filename);
                     btn.classList.add('success');
                     btn.textContent = '✓ 已下载';
                     setTimeout(() => {
@@ -1678,78 +1186,24 @@
             mediaContainer.querySelectorAll('.btn-media-copy').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    const type = btn.dataset.type;
-                    const index = parseInt(btn.dataset.index, 10);
-                    const media = getMediaItem(type, index);
-                    if (!media) return;
-
+                    const url = btn.dataset.url;
                     try {
-                        await navigator.clipboard.writeText(media.url);
+                        await navigator.clipboard.writeText(url);
                         btn.classList.add('success');
                         btn.textContent = '✓ 已复制';
                         setTimeout(() => {
                             btn.classList.remove('success');
-                            btn.textContent = '地址';
+                            btn.textContent = '复制地址';
                         }, 2000);
                     } catch (err) {
                         console.error('复制失败:', err);
                     }
                 });
             });
-
-            mediaContainer.querySelectorAll('.media-card').forEach(card => {
-                const checkbox = card.querySelector('.media-select');
-                if (!checkbox) return;
-
-                card.querySelector('.media-preview img')?.addEventListener('click', () => {
-                    checkbox.checked = !checkbox.checked;
-                });
-
-                card.querySelector('.video-click-top')?.addEventListener('click', () => {
-                    checkbox.checked = !checkbox.checked;
-                });
-            });
-
-            mediaContainer.querySelectorAll('.video-click-bottom').forEach(zone => {
-                zone.addEventListener('click', () => {
-                    const preview = zone.closest('.media-preview');
-                    const video = preview?.querySelector('video');
-                    const indicator = zone.querySelector('.video-play-indicator');
-                    if (!video || !indicator) return;
-
-                    if (video.paused) {
-                        video.play().then(() => {
-                            indicator.textContent = 'Ⅱ';
-                        }).catch(err => {
-                            console.error('视频播放失败:', err);
-                        });
-                    } else {
-                        video.pause();
-                        indicator.textContent = '▶';
-                    }
-                });
-            });
-
-            mediaContainer.querySelectorAll('.media-preview video').forEach(video => {
-                video.addEventListener('pause', () => {
-                    const indicator = video.closest('.media-preview')?.querySelector('.video-play-indicator');
-                    if (indicator) indicator.textContent = '▶';
-                });
-                video.addEventListener('play', () => {
-                    const indicator = video.closest('.media-preview')?.querySelector('.video-play-indicator');
-                    if (indicator) indicator.textContent = 'Ⅱ';
-                });
-                video.addEventListener('ended', () => {
-                    const indicator = video.closest('.media-preview')?.querySelector('.video-play-indicator');
-                    if (indicator) indicator.textContent = '▶';
-                });
-            });
         }
 
         floatingBtn.addEventListener('click', () => {
             const { images, videos } = updateImageCount();
-            activeTab = images.length === 0 && videos.length > 0 ? 'video' : 'image';
-            updateTabLabels();
 
             if (images.length === 0 && videos.length === 0) {
                 mediaContainer.innerHTML = `
@@ -1759,30 +1213,11 @@
                     </div>
                 `;
             } else {
-                renderMedia(activeTab);
+                renderMedia(images, videos);
             }
 
             modal.classList.add('show');
         });
-
-        tabButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                clearAllSelections();
-                activeTab = btn.dataset.tab;
-                updateTabLabels();
-                renderMedia(activeTab);
-            });
-        });
-
-        selectAllBtn.addEventListener('click', () => {
-            setCurrentTabSelection(true);
-        });
-
-        clearSelectionBtn.addEventListener('click', () => {
-            setCurrentTabSelection(false);
-        });
-
-        batchDownloadBtn.addEventListener('click', runBatchDownload);
 
         closeBtn.addEventListener('click', () => {
             modal.classList.remove('show');
@@ -1803,7 +1238,7 @@
     function initScript() {
         console.log('[AI 素材提取器] 脚本已加载');
         
-        if (pageWindow.location.pathname.includes('/chat/')) {
+        if (window.location.pathname.includes('/chat/')) {
             createFloatingButton();
             return;
         }
@@ -1822,7 +1257,7 @@
             }
         }
 
-        if (pageWindow.location.hostname.includes('doubao.com') && pageWindow.location.pathname.includes('/thread/')) {
+        if (window.location.hostname.includes('doubao.com') && window.location.pathname.includes('/thread/')) {
             chatImages = extractSharePageImages();
         }
         

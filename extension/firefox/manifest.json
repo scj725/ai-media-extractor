@@ -20,7 +20,7 @@
     "https://qianwen.my.cn/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["background.js"]
   },
   "content_scripts": [
     {
@@ -52,5 +52,15 @@
       "128": "icons/icon128.png"
     }
   },
-  "homepage_url": "https://github.com/scj725/ai-media-extractor"
+  "homepage_url": "https://github.com/scj725/ai-media-extractor",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ai-media-extractor@scj725.github.io",
+      "strict_min_version": "128.0",
+      "data_collection_permissions": {
+        "required": ["none"],
+        "optional": []
+      }
+    }
+  }
 }

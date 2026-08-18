@@ -48,12 +48,25 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/parse-video -ContentTy
 
 更新代码后，回到扩展管理页点击“重新加载”，然后用 `Ctrl + F5` 刷新目标页面。
 
+## Firefox 扩展
+
+要求 Firefox 128 或更高版本：
+
+1. 打开 `about:debugging#/runtime/this-firefox`。
+2. 点击“临时载入附加组件”。
+3. 选择 `D:\插件\ai-media-extractor\extension\firefox\manifest.json`。
+4. 登录目标平台并刷新页面，点击右下角素材按钮。
+
+临时附加组件会在 Firefox 退出后被移除。重新启动浏览器后，需要再次执行上述加载步骤。
+
 ## Tampermonkey 脚本
 
 1. 安装 Tampermonkey。
 2. 新建脚本并删除默认内容。
 3. 粘贴 `extension\tampermonkey-script\ai-media-extractor.user.js` 的完整内容，保存。
 4. 刷新豆包或千问页面，点击右下角素材按钮。
+
+同一个页面只启用扩展或油猴脚本其中一种。测试 Firefox 扩展时，请先在 Tampermonkey 中暂时停用本脚本，避免重复注入导致素材面板报错。
 
 ## 代理设置
 
@@ -75,5 +88,13 @@ $env:HTTP_PROXY = "http://127.0.0.1:7890"
 ## 来源与许可
 
 本项目基于 [ihmily/doubao-nomark](https://github.com/ihmily/doubao-nomark) 的 MIT 许可证代码进行修改与重构。请保留项目中的 [LICENSE](LICENSE)。
+
+## 交流与反馈
+
+- QQ 交流群：`771436309`
+- GitHub Issues：<https://github.com/scj725/ai-media-extractor/issues>
+- 项目地址：<https://github.com/scj725/ai-media-extractor>
+
+反馈问题时请附上浏览器及版本、扩展或脚本版本、复现步骤和控制台报错。请勿发送账号、Cookie 或 Token。
 
 **注意**：使用本服务时请遵守豆包、千问等目标平台的使用条款、内容权利和相关法律法规。请仅处理你有权访问、保存或使用的内容。

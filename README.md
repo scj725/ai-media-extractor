@@ -1,6 +1,6 @@
 # AI Media Extractor
 
-从豆包和千问对话、分享页面提取图片与视频资源的本地工具。项目提供三种使用方式：本地 Web/API 服务、Chrome/Edge 扩展和 Tampermonkey 脚本。
+从豆包和千问对话、分享页面提取图片与视频资源的本地工具。项目提供本地 Web/API 服务、Chrome/Edge/Firefox 扩展和 Tampermonkey 脚本。
 
 仓库地址：[scj725/ai-media-extractor](https://github.com/scj725/ai-media-extractor)
 
@@ -95,7 +95,7 @@ Content-Type: application/json
 
 ## 浏览器扩展
 
-支持 Chrome 和 Edge：
+### Chrome / Edge
 
 1. 打开 `chrome://extensions/` 或 `edge://extensions/`。
 2. 开启开发者模式。
@@ -103,7 +103,27 @@ Content-Type: application/json
 4. 选择 `extension/edge` 目录。
 5. 登录目标平台，打开目标页面并刷新，然后点击右下角素材按钮。
 
-不要选择项目根目录。浏览器扩展根目录必须是 `extension/edge`，项目根目录可能包含 Python 的 `__pycache__`，浏览器会拒绝加载。
+### Firefox
+
+Firefox 扩展要求 Firefox 128 或更高版本：
+
+1. 打开 `about:debugging#/runtime/this-firefox`。
+2. 点击“临时载入附加组件”。
+3. 选择 `extension/firefox/manifest.json`。
+4. 登录目标平台，打开目标页面并刷新，然后点击右下角素材按钮。
+
+临时载入的扩展会在 Firefox 退出后被移除，重新启动 Firefox 后需要再次载入。正式签名发布需通过 Firefox Add-ons 平台打包和签名。
+
+不要选择项目根目录。Chrome/Edge 的扩展根目录是 `extension/edge`；Firefox 需要选择 `extension/firefox/manifest.json`。项目根目录可能包含 Python 的 `__pycache__`，浏览器会拒绝加载。
+
+Firefox 实测使用步骤：
+
+1. 在 Firefox 中打开 `about:debugging#/runtime/this-firefox`。
+2. 点击“临时载入附加组件”，选择 `extension/firefox/manifest.json`。
+3. 登录豆包或千问，打开目标页面并刷新。
+4. 点击右下角素材按钮进行提取和下载。
+
+Firefox 临时附加组件在浏览器退出后会被移除，重新启动后需要再次载入。
 
 ## Tampermonkey
 
@@ -113,6 +133,8 @@ Content-Type: application/json
 4. 刷新豆包或千问页面，点击右下角素材按钮。
 
 脚本已配置 GitHub 更新地址。每次发布脚本改动时，递增脚本头部的 `@version` 后推送到 `main` 分支。
+
+同一个页面不要同时启用浏览器扩展和 Tampermonkey 脚本。两者功能重叠，同时运行会重复注入素材面板和网络拦截器。测试 Firefox 时建议暂时停用油猴脚本，只加载 `extension/firefox`。
 
 ## 代理
 
@@ -131,6 +153,22 @@ $env:HTTP_PROXY = "http://127.0.0.1:7890"
 - 千问视频没有显示：确认聊天页面中的视频卡片已经加载完成，再打开素材面板。
 - 扩展更新后无变化：在扩展管理页点击“重新加载”，然后使用 `Ctrl + F5` 刷新目标页面。
 - API 返回网络错误：确认 Python 进程可访问目标平台和对应 CDN，必要时配置代理。
+
+### Firefox 控制台出现 `selectAllBtn is null`
+
+通常是 Firefox 扩展和 Tampermonkey 脚本同时运行造成的重复注入。请在 Tampermonkey 中暂时停用本脚本，只保留 Firefox 扩展，然后重新加载扩展并使用 `Ctrl + F5` 刷新页面。
+
+### Firefox 控制台出现浏览器或平台警告
+
+`WEBGL_debug_renderer_info is deprecated`、传感器弃用提示、`screen.availWidth` 指纹防护提示和豆包 CDN 自身的 `参数错误` 通常来自浏览器或目标页面，不是本项目的扩展清单错误。优先检查是否能正常打开素材面板和下载资源。
+
+## 交流与反馈
+
+- QQ 交流群：`771436309`
+- 问题反馈：[GitHub Issues](https://github.com/scj725/ai-media-extractor/issues)
+- 项目地址：[scj725/ai-media-extractor](https://github.com/scj725/ai-media-extractor)
+
+反馈问题时请提供浏览器名称及版本、扩展或脚本版本、页面类型、复现步骤和控制台报错截图。请勿发送账号、Cookie、Token 等敏感信息。
 
 ## 许可与来源
 
