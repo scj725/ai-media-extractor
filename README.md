@@ -158,6 +158,10 @@ $env:HTTP_PROXY = "http://127.0.0.1:7890"
 
 通常是 Firefox 扩展和 Tampermonkey 脚本同时运行造成的重复注入。请在 Tampermonkey 中暂时停用本脚本，只保留 Firefox 扩展，然后重新加载扩展并使用 `Ctrl + F5` 刷新页面。
 
+### Firefox 控制台出现 `Permission denied to access property "id"`
+
+这是旧版扩展在页面脚本与扩展隔离世界之间传递对象消息导致的兼容性问题。请更新到当前代码后，在 `about:debugging#/runtime/this-firefox` 点击“重新加载”，关闭并重新打开豆包分享页；同时确认该页面没有启用 Tampermonkey 版本。当前版本已使用字符串消息桥接，不应再出现此错误。
+
 ### Firefox 控制台出现浏览器或平台警告
 
 `WEBGL_debug_renderer_info is deprecated`、传感器弃用提示、`screen.availWidth` 指纹防护提示和豆包 CDN 自身的 `参数错误` 通常来自浏览器或目标页面，不是本项目的扩展清单错误。优先检查是否能正常打开素材面板和下载资源。

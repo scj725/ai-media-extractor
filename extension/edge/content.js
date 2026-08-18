@@ -449,13 +449,15 @@
         return new Promise((resolve, reject) => {
             const id = `db-fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
             const onResponse = event => {
-                if (event.detail?.id !== id) return;
+                let detail;
+                try { detail = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail; } catch (_) { return; }
+                if (detail?.id !== id) return;
                 window.removeEventListener('ai-media-extractor-fallback-response', onResponse);
-                if (!event.detail.ok) { reject(new Error(event.detail.error || 'Fallback request failed.')); return; }
-                resolve(event.detail.data);
+                if (!detail.ok) { reject(new Error(detail.error || 'Fallback request failed.')); return; }
+                resolve(detail.data);
             };
             window.addEventListener('ai-media-extractor-fallback-response', onResponse);
-            window.dispatchEvent(new CustomEvent('ai-media-extractor-fallback-request', { detail: { id, url } }));
+            window.dispatchEvent(new CustomEvent('ai-media-extractor-fallback-request', { detail: JSON.stringify({ id, url }) }));
             setTimeout(() => {
                 window.removeEventListener('ai-media-extractor-fallback-response', onResponse);
                 reject(new Error('Fallback request timed out.'));
