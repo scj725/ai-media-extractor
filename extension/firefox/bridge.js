@@ -11,3 +11,14 @@ window.addEventListener('ai-media-extractor-fallback-request', event => {
         }) }));
     });
 });
+
+window.addEventListener('ai-media-extractor-settings-request', event => {
+    let detail;
+    try { detail = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail || {}; } catch (_) { return; }
+    if (!detail.id) return;
+    chrome.storage.local.get({ autoDownload: false }, settings => {
+        window.dispatchEvent(new CustomEvent('ai-media-extractor-settings-response', {
+            detail: JSON.stringify({ id: detail.id, autoDownload: Boolean(settings.autoDownload) })
+        }));
+    });
+});

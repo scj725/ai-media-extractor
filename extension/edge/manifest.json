@@ -1,21 +1,19 @@
 {
   "manifest_version": 3,
   "name": "AI Media Extractor",
-  "version": "0.2.1",
-  "description": "Extract media assets from supported AI chat and share pages.",
+  "version": "0.3.0",
+  "description": "Extract media assets and optionally auto-download newly generated images and videos.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "permissions": [
-    "activeTab",
     "storage"
   ],
   "host_permissions": [
     "https://www.doubao.com/*",
     "https://vas-lf-x.snssdk.com/*",
-    "https://*.douyin.com/*",
     "https://www.qianwen.com/*",
     "https://qianwen.my.cn/*"
   ],

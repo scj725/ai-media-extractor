@@ -139,12 +139,19 @@
             vertical-align: middle;
             margin-left: 5px;
         }
+
+        .settings { margin-top: 14px; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; background: #fafafa; }
+        .setting-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+        .setting-row input { margin-top: 2px; accent-color: #1f1f1f; }
+        .setting-title { font-size: 13px; font-weight: 600; }
+        .setting-desc { margin-top: 3px; font-size: 11px; line-height: 1.4; color: #777; }
+        .setting-status { margin-top: 8px; font-size: 11px; color: #4b7f52; min-height: 14px; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-icon">📷</div>
-        <h1>AI 素材提取器<span class="header-version">v0.2.1</span></h1>
+            <h1>AI 素材提取器<span class="header-version">v0.3.0</span></h1>
         <p class="header-sub">无水印图片/视频提取工具</p>
     </div>
 
@@ -164,10 +171,19 @@
             </li>
         </ul>
 
+        <div class="settings">
+            <label class="setting-row">
+                <input id="auto-download" type="checkbox">
+                <span><span class="setting-title">检测到新素材时自动下载</span><br><span class="setting-desc">默认关闭。只处理本次页面中新发现的图片和视频。</span></span>
+            </label>
+            <div id="setting-status" class="setting-status" aria-live="polite"></div>
+        </div>
+
     </div>
 
     <div class="footer">
         <span class="footer-text">AI 素材提取器</span>
     </div>
+    <script src="popup.js"></script>
 </body>
 </html>

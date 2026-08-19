@@ -7,6 +7,48 @@
     let chatImages = [];
     let chatVideos = [];
     let floatingBtnElement = null;
+    let autoDownloadEnabled = false;
+    const autoDownloadedUrls = new Set();
+
+    function loadSettings() {
+        const id = `${Date.now()}-${Math.random()}`;
+        const onResponse = event => {
+            let data;
+            try { data = JSON.parse(event.detail); } catch (_) { return; }
+            if (data.id !== id) return;
+            window.removeEventListener('ai-media-extractor-settings-response', onResponse);
+            autoDownloadEnabled = Boolean(data.autoDownload);
+        };
+        window.addEventListener('ai-media-extractor-settings-response', onResponse);
+        window.dispatchEvent(new CustomEvent('ai-media-extractor-settings-request', { detail: JSON.stringify({ id }) }));
+    }
+
+    function autoDownload(url, type, index) {
+        if (!autoDownloadEnabled || !url || autoDownloadedUrls.has(url)) return;
+        autoDownloadedUrls.add(url);
+        const extension = type === 'video' ? 'mp4' : 'png';
+        downloadImage(url, `ai_media_auto_${type}_${index}.${extension}`);
+        updateAutoDownloadIndicator(url);
+    }
+
+    function updateAutoDownloadIndicator(url) {
+        document.querySelectorAll('.btn-media-download').forEach(button => {
+            if (button.dataset.url !== url) return;
+            button.classList.add('success');
+            button.textContent = '✓ 已自动下载';
+        });
+        document.querySelectorAll('.auto-download-badge').forEach(badge => {
+            if (badge.dataset.url === url) badge.hidden = false;
+        });
+    }
+
+    function addChatImage(image) {
+        if (!image?.url || chatImages.some(item => item.url === image.url)) return;
+        chatImages.push(image);
+        autoDownload(image.url, 'image', chatImages.length);
+        updateButtonCount();
+        window.dispatchEvent(new Event('ai-media-extractor-media-added'));
+    }
 
     function updateButtonCount() {
         if (!floatingBtnElement) return;
@@ -20,8 +62,10 @@
         if (!videoInfo || !videoInfo.url) return;
         if (chatVideos.find(v => v.vid === videoInfo.vid || v.url === videoInfo.url)) return;
         chatVideos.push(videoInfo);
+        autoDownload(videoInfo.url, 'video', chatVideos.length);
         console.log('[AI 素材提取器] 获取到新视频:', videoInfo.vid, videoInfo.url);
         updateButtonCount();
+        window.dispatchEvent(new Event('ai-media-extractor-media-added'));
     }
 
     const originalXHROpen = XMLHttpRequest.prototype.open;
@@ -204,7 +248,7 @@
                     if (!imageObj?.url) continue;
                     const { url, width = 0, height = 0 } = imageObj;
                     if (!chatImages.find(img => img.url === url)) {
-                        chatImages.push({ url, width, height });
+                        addChatImage({ url, width, height });
                         console.log('[AI 素材提取器][千问] 获取到图片:', url, `${width} × ${height}`);
                         updateButtonCount();
                     }
@@ -320,7 +364,7 @@
                         }
                         
                         if (imageUrl && !chatImages.find(img => img.url === imageUrl)) {
-                            chatImages.push({ url: imageUrl, width, height });
+                            addChatImage({ url: imageUrl, width, height });
                             console.log('[AI 素材提取器] 获取到新图片:', imageUrl, `${width} × ${height}`);
                             updateButtonCount();
                         }
@@ -891,6 +935,7 @@
                     height: var(--media-preview-height);
                     display: block;
                     background: #000;
+                    position: relative;
                 }
 
                 .media-preview video {
@@ -945,6 +990,19 @@
                     font-weight: 500;
                     opacity: 0;
                     transition: opacity 0.2s ease;
+                }
+
+                .auto-download-badge {
+                    position: absolute;
+                    left: 8px;
+                    top: 8px;
+                    padding: 4px 7px;
+                    border-radius: 4px;
+                    background: #166534;
+                    color: #ffffff;
+                    font-size: 11px;
+                    font-weight: 600;
+                    z-index: 1;
                 }
                 
                 .media-card:hover .image-info {
@@ -1131,6 +1189,7 @@
                         <div class="media-card">
                             <div class="media-preview">
                                 <img src="${image.url}" alt="图片 ${item.index + 1}" loading="lazy">
+                                <div class="auto-download-badge" data-url="${image.url}"${autoDownloadedUrls.has(image.url) ? '' : ' hidden'}>✓ 已自动下载</div>
                                 ${resolution ? `<div class="image-info">${resolution}</div>` : ''}
                             </div>
                             <div class="video-meta">
@@ -1151,8 +1210,9 @@
                 const posterAttr = video.poster_url ? ` poster="${video.poster_url}"` : '';
                 return `
                     <div class="media-card">
-                        <div class="media-preview">
-                            <video src="${video.url}" controls preload="none" playsinline${posterAttr}></video>
+                            <div class="media-preview">
+                                <video src="${video.url}" controls preload="none" playsinline${posterAttr}></video>
+                                <div class="auto-download-badge" data-url="${video.url}"${autoDownloadedUrls.has(video.url) ? '' : ' hidden'}>✓ 已自动下载</div>
                         </div>
                         <div class="video-meta">
                             <span class="video-meta-item">🎬 视频</span>
@@ -1204,6 +1264,12 @@
             });
         }
 
+        window.addEventListener('ai-media-extractor-media-added', () => {
+            if (!modal.classList.contains('show')) return;
+            const { images, videos } = updateImageCount();
+            renderMedia(images, videos);
+        });
+
         floatingBtn.addEventListener('click', () => {
             const { images, videos } = updateImageCount();
 
@@ -1239,6 +1305,7 @@
 
     function initScript() {
         console.log('[AI 素材提取器] 脚本已加载');
+        loadSettings();
         
         if (window.location.pathname.includes('/chat/')) {
             createFloatingButton();
