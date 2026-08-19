@@ -48,37 +48,6 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/parse-video -ContentTy
 
 更新代码后，回到扩展管理页点击“重新加载”，然后用 `Ctrl + F5` 刷新目标页面。
 
-## GitHub ZIP 分发
-
-不通过浏览器插件市场时，从 GitHub Releases 下载对应浏览器的 ZIP。Windows 用户也可以在项目根目录执行：
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\package-extensions.ps1
-```
-
-本地生成的产物位于 `dist\`：
-
-```text
-ai-media-extractor-chrome-v<版本>.zip
-ai-media-extractor-edge-v<版本>.zip
-ai-media-extractor-firefox-v<版本>.zip
-```
-
-Chrome 安装：
-
-1. 解压 `chrome` ZIP（Edge 也可使用同一个 ZIP）。
-2. 打开 `chrome://extensions/` 或 `edge://extensions/`。
-3. 开启右上角“开发者模式”。
-4. 点击“加载已解压的扩展程序”，选择解压后直接包含 `manifest.json` 的文件夹。
-5. 登录豆包或千问，并刷新目标页面。
-
-更新：下载新版本 ZIP，解压到新的文件夹，在扩展管理页点击扩展的“重新加载”或移除旧目录后重新加载，然后刷新目标页面。只要仍在同一个浏览器用户配置中，自动下载开关等 `storage.local` 设置会保留。
-
-Firefox 的 ZIP 仅用于打包和测试。普通 Firefox 用户需要安装 Mozilla 签名后的 `.xpi`；未签名 ZIP 不能作为长期安装包。Firefox 临时测试仍可在 `about:debugging#/runtime/this-firefox` 中载入 `manifest.json`。
-
-GitHub Actions 发布：提交版本 tag（例如 `v0.3.1`）并推送后，`.github/workflows/package-extensions.yml` 会自动打包，并把 ZIP 上传到对应 GitHub Release；也可以手动运行该 workflow 获取 artifact。
-
 ## Firefox 扩展
 
 要求 Firefox 128 或更高版本：

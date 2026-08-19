@@ -96,43 +96,6 @@ Content-Type: application/json
 
 ## 浏览器扩展
 
-### 免费发布与手动更新
-
-不使用浏览器插件市场时，可以通过 GitHub Releases 分发 ZIP。项目已经提供统一打包脚本和 GitHub Actions：
-
-本地打包（Windows PowerShell）：
-
-```powershell
-cd D:\插件\doubao-nomark
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\package-extensions.ps1
-```
-
-脚本会读取两个 manifest 的版本号，在仓库根目录生成 `dist` 文件夹：
-
-```text
-dist\ai-media-extractor-chrome-v0.3.0.zip
-dist\ai-media-extractor-edge-v0.3.0.zip
-dist\ai-media-extractor-firefox-v0.3.0.zip
-```
-
-其中 Chrome 和 Edge 使用同一份 Chromium 扩展代码。压缩包内部就是扩展根目录，解压后应直接看到 `manifest.json`，不要再选择外层项目目录。
-
-发布新版本时递增两个扩展 manifest 的 `version`，提交并创建 tag：
-
-```powershell
-git add extension README.md scripts .github
-git commit -m "Release v0.3.1"
-git tag v0.3.1
-git push origin main --tags
-```
-
-GitHub Actions 会自动运行打包脚本，并将三个 ZIP 放到 GitHub Release 的附件中。也可以在 Actions 页面手动运行 `Package browser extensions`，生成的 ZIP 会出现在 workflow artifact 中。
-
-首次使用 Actions 发布 Release 时，到仓库 `Settings > Actions > General > Workflow permissions` 选择允许 workflow 读写仓库内容；否则 workflow 只能生成 artifact，不能创建 Release 附件。
-
-用户安装和更新步骤见 [INSTALL.md](INSTALL.md) 的“GitHub ZIP 分发”章节。GitHub ZIP 适合 Chrome/Edge 的“加载已解压的扩展程序”；Firefox 普通用户不能直接安装未签名 ZIP，正式安装需要 Mozilla 签名后的 XPI。
-
 ### Chrome / Edge
 
 1. 打开 `chrome://extensions/` 或 `edge://extensions/`。
@@ -142,10 +105,6 @@ GitHub Actions 会自动运行打包脚本，并将三个 ZIP 放到 GitHub Rele
 5. 登录目标平台，打开目标页面并刷新，然后点击右下角素材按钮。
 
 自动下载设置：点击浏览器工具栏中的扩展图标，勾选“检测到新素材时自动下载”。关闭后只保留手动下载；浏览器可能会对短时间内的多次下载显示一次允许提示。
-
-#### Chrome Web Store 上架准备
-
-Chrome/Edge 的 `extension/edge` 已使用 Manifest V3、无远程代码，当前权限只用于目标站点的媒体解析和本地设置。正式提交 Chrome Web Store 前仍需准备开发者账号、商店截图/宣传图、支持邮箱和隐私政策链接，并在隐私声明中说明：扩展不上传聊天内容，不建立用户画像，`autoDownload` 仅保存于 `chrome.storage.local`。可直接参考 [隐私政策草案](docs/PRIVACY_POLICY.md)。商店审核还可能要求解释对豆包、千问页面的 host permissions；提交说明应与扩展的单一用途（提取并下载用户可见媒体）一致。
 
 ### Firefox
 
