@@ -711,7 +711,7 @@
         return chatVideos;
     }
 
-    async function downloadImage(url, filename) {
+    async function downloadImage(url, filename, showError = true) {
         try {
             console.log('[AI 素材提取器] 开始下载:', url);
             
@@ -730,9 +730,11 @@
             setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
             
             console.log('[AI 素材提取器] 下载完成:', filename);
+            return true;
         } catch (error) {
             console.error('[AI 素材提取器] 下载失败:', error);
-            alert('下载失败，请重试');
+            if (showError) alert('下载失败，请重试');
+            return false;
         }
     }
 
@@ -860,6 +862,13 @@
                     display: flex;
                     flex-direction: column;
                 }
+
+                .modal-header-actions { display: flex; align-items: center; gap: 8px; }
+                .batch-btn { min-height: 32px; padding: 0 12px; border: 1px solid #d8d8d8; border-radius: 6px; background: #ffffff; color: #1f1f1f; cursor: pointer; font-size: 13px; font-weight: 600; }
+                .batch-btn:hover:not(:disabled) { border-color: #1f1f1f; background: #f7f7f7; }
+                .batch-btn.primary { color: #ffffff; border-color: #1f1f1f; background: #1f1f1f; }
+                .batch-btn.primary:hover:not(:disabled) { background: #3a3a3a; }
+                .batch-btn:disabled { opacity: 0.45; cursor: not-allowed; }
                 
                 .close-btn {
                     width: 32px;
@@ -929,6 +938,10 @@
                 .media-card:hover {
                     border-color: #1f1f1f;
                 }
+
+                .media-card.selected { border-color: #1f1f1f; box-shadow: 0 0 0 2px rgba(31, 31, 31, 0.12); }
+                .media-select { position: absolute; right: 8px; top: 8px; z-index: 3; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2); cursor: pointer; }
+                .media-select input { width: 16px; height: 16px; margin: 0; accent-color: #1f1f1f; cursor: pointer; }
 
                 .media-preview {
                     width: 100%;
@@ -1117,7 +1130,11 @@
                             <h3>素材提取器</h3>
                             <div class="subtitle" id="image-subtitle">共 0 张图片</div>
                         </div>
-                        <button class="close-btn">×</button>
+                        <div class="modal-header-actions">
+                            <button class="batch-btn" id="select-all-btn" type="button">全选</button>
+                            <button class="batch-btn primary" id="batch-download-btn" type="button" disabled>下载所选 (0)</button>
+                            <button class="close-btn" type="button">×</button>
+                        </div>
                     </div>
                     <div class="modal-body">
                         <div class="media-grid" id="media-container"></div>
@@ -1147,9 +1164,32 @@
         const closeBtn = modal.querySelector('.close-btn');
         const mediaContainer = document.getElementById('media-container');
         const imageSubtitle = document.getElementById('image-subtitle');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const batchDownloadBtn = document.getElementById('batch-download-btn');
 
         let currentImages = [];
         let currentVideos = [];
+        const selectedUrls = new Set();
+        let batchDownloading = false;
+
+        function getMediaItems(images = currentImages, videos = currentVideos) {
+            return [
+                ...images.map((image, index) => ({ type: 'image', data: image, index })),
+                ...videos.map((video, index) => ({ type: 'video', data: video, index })),
+            ];
+        }
+
+        function updateBatchControls() {
+            const items = getMediaItems();
+            const availableUrls = new Set(items.map(item => item.data.url));
+            [...selectedUrls].forEach(url => { if (!availableUrls.has(url)) selectedUrls.delete(url); });
+            const selectedCount = selectedUrls.size;
+            const allSelected = items.length > 0 && selectedCount === items.length;
+            selectAllBtn.textContent = allSelected ? '取消全选' : '全选';
+            selectAllBtn.disabled = batchDownloading || items.length === 0;
+            batchDownloadBtn.disabled = batchDownloading || selectedCount === 0;
+            batchDownloadBtn.textContent = batchDownloading ? '正在下载…' : `下载所选 (${selectedCount})`;
+        }
 
         function formatDuration(sec) {
             if (!sec || sec <= 0) return '';
@@ -1171,13 +1211,11 @@
         }
 
         function renderMedia(images, videos) {
-            const mediaItems = [
-                ...images.map((image, index) => ({ type: 'image', data: image, index })),
-                ...videos.map((video, index) => ({ type: 'video', data: video, index })),
-            ];
+            const mediaItems = getMediaItems(images, videos);
 
             if (mediaItems.length === 0) {
                 mediaContainer.innerHTML = '';
+                updateBatchControls();
                 return;
             }
 
@@ -1186,9 +1224,10 @@
                     const image = item.data;
                     const resolution = (image.width && image.height) ? `${image.width} × ${image.height}` : '';
                     return `
-                        <div class="media-card">
+                        <div class="media-card${selectedUrls.has(image.url) ? ' selected' : ''}" data-url="${image.url}">
                             <div class="media-preview">
                                 <img src="${image.url}" alt="图片 ${item.index + 1}" loading="lazy">
+                                <label class="media-select" title="选择图片"><input class="media-checkbox" type="checkbox" data-url="${image.url}"${selectedUrls.has(image.url) ? ' checked' : ''} aria-label="选择图片 ${item.index + 1}"></label>
                                 <div class="auto-download-badge" data-url="${image.url}"${autoDownloadedUrls.has(image.url) ? '' : ' hidden'}>✓ 已自动下载</div>
                                 ${resolution ? `<div class="image-info">${resolution}</div>` : ''}
                             </div>
@@ -1209,9 +1248,10 @@
                 const duration = formatDuration(video.duration);
                 const posterAttr = video.poster_url ? ` poster="${video.poster_url}"` : '';
                 return `
-                    <div class="media-card">
-                        <div class="media-preview">
-                            <video src="${video.url}" controls preload="none" playsinline${posterAttr}></video>
+                    <div class="media-card${selectedUrls.has(video.url) ? ' selected' : ''}" data-url="${video.url}">
+                            <div class="media-preview">
+                                <video src="${video.url}" controls preload="none" playsinline${posterAttr}></video>
+                                <label class="media-select" title="选择视频"><input class="media-checkbox" type="checkbox" data-url="${video.url}"${selectedUrls.has(video.url) ? ' checked' : ''} aria-label="选择视频 ${item.index + 1}"></label>
                             <div class="auto-download-badge" data-url="${video.url}"${autoDownloadedUrls.has(video.url) ? '' : ' hidden'}>✓ 已自动下载</div>
                         </div>
                         <div class="video-meta">
@@ -1227,6 +1267,15 @@
                     </div>
                 `;
             }).join('');
+
+            mediaContainer.querySelectorAll('.media-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) selectedUrls.add(checkbox.dataset.url);
+                    else selectedUrls.delete(checkbox.dataset.url);
+                    checkbox.closest('.media-card')?.classList.toggle('selected', checkbox.checked);
+                    updateBatchControls();
+                });
+            });
 
             mediaContainer.querySelectorAll('.btn-media-download').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -1262,7 +1311,35 @@
                     }
                 });
             });
+            updateBatchControls();
         }
+
+        selectAllBtn.addEventListener('click', () => {
+            const items = getMediaItems();
+            const allSelected = items.length > 0 && items.every(item => selectedUrls.has(item.data.url));
+            items.forEach(item => {
+                if (allSelected) selectedUrls.delete(item.data.url);
+                else selectedUrls.add(item.data.url);
+            });
+            renderMedia(currentImages, currentVideos);
+        });
+
+        batchDownloadBtn.addEventListener('click', async () => {
+            if (batchDownloading) return;
+            const selectedItems = getMediaItems().filter(item => selectedUrls.has(item.data.url));
+            if (selectedItems.length === 0) return;
+            batchDownloading = true;
+            updateBatchControls();
+            let successCount = 0;
+            for (const item of selectedItems) {
+                const extension = item.type === 'video' ? 'mp4' : 'png';
+                const filename = `ai_media_${item.type}_${item.index + 1}.${extension}`;
+                if (await downloadImage(item.data.url, filename, false)) successCount++;
+            }
+            batchDownloading = false;
+            updateBatchControls();
+            if (successCount !== selectedItems.length) alert(`批量下载完成：成功 ${successCount} 个，失败 ${selectedItems.length - successCount} 个。`);
+        });
 
         window.addEventListener('ai-media-extractor-media-added', () => {
             if (!modal.classList.contains('show')) return;
