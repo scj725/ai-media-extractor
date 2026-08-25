@@ -9,6 +9,7 @@
     let floatingBtnElement = null;
     let autoDownloadEnabled = false;
     const autoDownloadedUrls = new Set();
+    const autoDownloadInFlight = new Set();
 
     function loadSettings() {
         const id = `${Date.now()}-${Math.random()}`;
@@ -18,17 +19,27 @@
             if (data.id !== id) return;
             window.removeEventListener('ai-media-extractor-settings-response', onResponse);
             autoDownloadEnabled = Boolean(data.autoDownload);
+            if (Array.isArray(data.autoDownloadedUrls)) {
+                data.autoDownloadedUrls.forEach(url => { if (typeof url === 'string' && url) autoDownloadedUrls.add(url); });
+            }
         };
         window.addEventListener('ai-media-extractor-settings-response', onResponse);
         window.dispatchEvent(new CustomEvent('ai-media-extractor-settings-request', { detail: JSON.stringify({ id }) }));
     }
 
-    function autoDownload(url, type, index) {
-        if (!autoDownloadEnabled || !url || autoDownloadedUrls.has(url)) return;
-        autoDownloadedUrls.add(url);
+    async function autoDownload(url, type, index) {
+        if (!autoDownloadEnabled || !url || autoDownloadedUrls.has(url) || autoDownloadInFlight.has(url)) return;
+        autoDownloadInFlight.add(url);
         const extension = type === 'video' ? 'mp4' : 'png';
-        downloadImage(url, `ai_media_auto_${type}_${index}.${extension}`);
-        updateAutoDownloadIndicator(url);
+        try {
+            const downloaded = await downloadImage(url, `ai_media_auto_${type}_${index}.${extension}`, false);
+            if (!downloaded || autoDownloadedUrls.has(url)) return;
+            autoDownloadedUrls.add(url);
+            window.dispatchEvent(new CustomEvent('ai-media-extractor-auto-download-mark', { detail: JSON.stringify({ url }) }));
+            updateAutoDownloadIndicator(url);
+        } finally {
+            autoDownloadInFlight.delete(url);
+        }
     }
 
     function updateAutoDownloadIndicator(url) {

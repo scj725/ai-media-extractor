@@ -18,9 +18,20 @@ window.addEventListener('ai-media-extractor-settings-request', event => {
     let detail;
     try { detail = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail || {}; } catch (_) { return; }
     if (!detail.id) return;
-    chrome.storage.local.get({ autoDownload: false }, settings => {
+    chrome.storage.local.get({ autoDownload: false, autoDownloadedUrls: [] }, settings => {
         window.dispatchEvent(new CustomEvent('ai-media-extractor-settings-response', {
-            detail: JSON.stringify({ id: detail.id, autoDownload: Boolean(settings.autoDownload) })
+            detail: JSON.stringify({ id: detail.id, autoDownload: Boolean(settings.autoDownload), autoDownloadedUrls: Array.isArray(settings.autoDownloadedUrls) ? settings.autoDownloadedUrls : [] })
         }));
+    });
+});
+
+window.addEventListener('ai-media-extractor-auto-download-mark', event => {
+    let detail;
+    try { detail = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail || {}; } catch (_) { return; }
+    if (typeof detail.url !== 'string' || !detail.url) return;
+    chrome.storage.local.get({ autoDownloadedUrls: [] }, settings => {
+        const urls = Array.isArray(settings.autoDownloadedUrls) ? settings.autoDownloadedUrls.filter(url => typeof url === 'string') : [];
+        if (!urls.includes(detail.url)) urls.push(detail.url);
+        chrome.storage.local.set({ autoDownloadedUrls: urls.slice(-500) });
     });
 });
