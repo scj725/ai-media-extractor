@@ -1,6 +1,6 @@
 # AI Media Extractor
 
-从豆包和千问对话、分享页面提取图片与视频资源的本地工具。项目提供本地 Web/API 服务、Chrome/Edge/Firefox 扩展和 Tampermonkey 脚本。
+从豆包、Dola 和千问对话、分享页面提取图片与视频资源的本地工具。项目提供本地 Web/API 服务、Chrome/Edge/Firefox 扩展和 Tampermonkey 脚本。
 
 仓库地址：[scj725/ai-media-extractor](https://github.com/scj725/ai-media-extractor)
 
@@ -13,6 +13,7 @@
 - 可在扩展弹窗中开启“检测到新素材时自动下载”；该选项默认关闭，并保存在浏览器本地，扩展更新不会重置。
 - 素材面板支持勾选多个图片或视频后批量下载，也可使用“全选”一次下载当前页面的全部素材。
 - 自动下载会持久化已成功下载的素材地址，刷新或重新打开页面不会重复下载；下载失败的素材会在下次继续尝试。
+- 可在扩展设置中点击“清除自动下载记录”，方便重新下载历史素材。
 - 提供本地 Web 页面，以及 `POST` / `GET` 形式的图片、视频解析 API。
 - 支持 Windows 系统代理和 `HTTP_PROXY`、`HTTPS_PROXY` 环境变量。
 
@@ -22,6 +23,7 @@
 | --- | --- | --- | --- |
 | 豆包 | `www.doubao.com/thread/*` | 图片、视频 | 图片、视频 |
 | 豆包 | `www.doubao.com/chat/*` | 不适用 | 图片、视频 |
+| Dola | `www.dola.com/chat/*` | 不适用 | 图片、无水印视频（实验） |
 | 千问 | `www.qianwen.com/chat/*` | 不适用 | 图片、视频 |
 | 千问 | `www.qianwen.com/share/chat/*` | 图片 | 图片、视频 |
 | 千问 | `qianwen.my.cn/share/chat/*` | 图片、视频 | 图片、视频 |
@@ -100,6 +102,8 @@ Content-Type: application/json
 
 ### Chrome / Edge
 
+Chrome 扩展 `v0.5.6` 已试验性支持 Dola 对话页面（`https://www.dola.com/chat/*`）。图片复用豆包流式解析；视频优先从 Dola 的 `chain/single` 响应中提取原始地址，带水印的页面预览地址不会加入素材列表。Dola 视频时长通过 JSON.stringify、fetch 和 XHR 三层注入；可请求 15 秒或试验性的 30 秒视频。
+
 1. 打开 `chrome://extensions/` 或 `edge://extensions/`。
 2. 开启开发者模式。
 3. 点击“加载已解压的扩展程序”。
@@ -135,7 +139,11 @@ Firefox 临时附加组件在浏览器退出后会被移除，重新启动后需
 1. 安装 Tampermonkey。
 2. 新建脚本。
 3. 粘贴 [ai-media-extractor.user.js](extension/tampermonkey-script/ai-media-extractor.user.js) 的完整内容并保存。
-4. 刷新豆包或千问页面，点击右下角素材按钮。
+4. 刷新豆包、Dola 或千问页面，点击右下角素材按钮。
+
+在 Dola 页面生成视频前，可从 Tampermonkey 扩展的脚本菜单选择“Dola 视频时长：平台默认”、“15 秒”或“30 秒（实验）”；选择后脚本会刷新页面，使请求拦截器按新设置生效。30 秒是否可用由 Dola 当前账号、模型和服务端策略决定。
+
+Dola 视频优先从 `chain/single` 响应提取并解码原始视频地址，页面中带水印的预览地址不会加入下载列表。油猴脚本会在页面脚本之前安装拦截器，以便读取历史素材和新生成素材。
 
 脚本已配置 GitHub 更新地址。每次发布脚本改动时，递增脚本头部的 `@version` 后推送到 `main` 分支。
 

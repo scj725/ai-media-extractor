@@ -5,7 +5,7 @@
 ### 使用 uv
 
 ```powershell
-cd D:\插件\ai-media-extractor
+cd D:\插件\doubao-nomark
 uv sync
 uv run uvicorn app:app --host 127.0.0.1 --port 8000
 ```
@@ -13,7 +13,7 @@ uv run uvicorn app:app --host 127.0.0.1 --port 8000
 ### 使用 pip
 
 ```powershell
-cd D:\插件\ai-media-extractor
+cd D:\插件\doubao-nomark
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
@@ -43,8 +43,10 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/parse-video -ContentTy
 1. 打开 `chrome://extensions/` 或 `edge://extensions/`。
 2. 开启开发者模式。
 3. 点击“加载已解压的扩展程序”。
-4. 选择 `D:\插件\ai-media-extractor\extension\edge`。
-5. 登录目标平台并刷新页面，点击右下角素材按钮。
+4. 选择 `D:\插件\doubao-nomark\extension\edge`。
+5. 登录豆包、Dola 或千问并刷新页面，点击右下角素材按钮。
+
+Chrome/Edge 扩展支持 Dola 对话页 `https://www.dola.com/chat/*`。Dola 视频优先提取无水印原始地址，页面水印预览不会显示在素材列表中；扩展弹窗可选择平台默认、15 秒或试验性的 30 秒生成时长。
 
 更新代码后，回到扩展管理页点击“重新加载”，然后用 `Ctrl + F5` 刷新目标页面。
 
@@ -54,8 +56,8 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/parse-video -ContentTy
 
 1. 打开 `about:debugging#/runtime/this-firefox`。
 2. 点击“临时载入附加组件”。
-3. 选择 `D:\插件\ai-media-extractor\extension\firefox\manifest.json`。
-4. 登录目标平台并刷新页面，点击右下角素材按钮。
+3. 选择 `D:\插件\doubao-nomark\extension\firefox\manifest.json`。
+4. 登录豆包、Dola 或千问并刷新页面，点击右下角素材按钮。
 
 临时附加组件会在 Firefox 退出后被移除。重新启动浏览器后，需要再次执行上述加载步骤。
 
@@ -64,7 +66,9 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/parse-video -ContentTy
 1. 安装 Tampermonkey。
 2. 新建脚本并删除默认内容。
 3. 粘贴 `extension\tampermonkey-script\ai-media-extractor.user.js` 的完整内容，保存。
-4. 刷新豆包或千问页面，点击右下角素材按钮。
+4. 刷新豆包、Dola 或千问页面，点击右下角素材按钮。
+
+在 Dola 页面生成视频前，打开 Tampermonkey 扩展的脚本菜单，选择“Dola 视频时长：平台默认”、“15 秒”或“30 秒（实验）”。菜单切换后会自动刷新页面；30 秒由 Dola 服务端决定是否接受。脚本优先从 Dola 的 `chain/single` 响应提取无水印视频地址，并忽略页面带水印预览。
 
 同一个页面只启用扩展或油猴脚本其中一种。测试 Firefox 扩展时，请先在 Tampermonkey 中暂时停用本脚本，避免重复注入导致素材面板报错。
 
@@ -83,6 +87,7 @@ $env:HTTP_PROXY = "http://127.0.0.1:7890"
 
 - 豆包视频的无水印地址由平台回退接口返回，浏览器扩展需要使用你的已登录会话；接口不可用时不会改为下载已知带水印流。
 - 千问视频从已加载的视频播放器中读取地址。请等待视频卡片显示完成后再打开素材面板。
+- Dola 视频的无水印地址来自当前登录页返回的 `chain/single` 响应；请在视频生成完成后打开素材面板。平台默认、15 秒和试验性 30 秒的生成资格均受 Dola 服务端限制。
 - 本地 API、扩展和脚本的支持范围见 [README.md](README.md)。
 
 ## 来源与许可

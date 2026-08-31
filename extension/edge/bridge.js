@@ -18,9 +18,9 @@ window.addEventListener('ai-media-extractor-settings-request', event => {
     let detail;
     try { detail = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail || {}; } catch (_) { return; }
     if (!detail.id) return;
-    chrome.storage.local.get({ autoDownload: false, autoDownloadedUrls: [] }, settings => {
+    chrome.storage.local.get({ autoDownload: false, autoDownloadedUrls: [], dolaVideoDuration: 0 }, settings => {
         window.dispatchEvent(new CustomEvent('ai-media-extractor-settings-response', {
-            detail: JSON.stringify({ id: detail.id, autoDownload: Boolean(settings.autoDownload), autoDownloadedUrls: Array.isArray(settings.autoDownloadedUrls) ? settings.autoDownloadedUrls : [] })
+            detail: JSON.stringify({ id: detail.id, autoDownload: Boolean(settings.autoDownload), autoDownloadedUrls: Array.isArray(settings.autoDownloadedUrls) ? settings.autoDownloadedUrls : [], dolaVideoDuration: settings.dolaVideoDuration })
         }));
     });
 });
@@ -34,4 +34,19 @@ window.addEventListener('ai-media-extractor-auto-download-mark', event => {
         if (!urls.includes(detail.url)) urls.push(detail.url);
         chrome.storage.local.set({ autoDownloadedUrls: urls.slice(-500) });
     });
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (changes.autoDownloadedUrls) {
+        const urls = Array.isArray(changes.autoDownloadedUrls.newValue) ? changes.autoDownloadedUrls.newValue : [];
+        window.dispatchEvent(new CustomEvent('ai-media-extractor-auto-download-history-changed', {
+            detail: JSON.stringify({ autoDownloadedUrls: urls })
+        }));
+    }
+    if (changes.dolaVideoDuration) {
+        window.dispatchEvent(new CustomEvent('ai-media-extractor-settings-changed', {
+            detail: JSON.stringify({ dolaVideoDuration: changes.dolaVideoDuration.newValue })
+        }));
+    }
 });

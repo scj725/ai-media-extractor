@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Media Extractor",
-  "version": "0.4.1",
+  "version": "0.5.6",
   "description": "Extract media assets and optionally auto-download newly generated images and videos.",
   "icons": {
     "16": "icons/icon16.png",
@@ -13,6 +13,7 @@
   ],
   "host_permissions": [
     "https://www.doubao.com/*",
+    "https://www.dola.com/*",
     "https://vas-lf-x.snssdk.com/*",
     "https://www.qianwen.com/*",
     "https://qianwen.my.cn/*"
@@ -24,7 +25,8 @@
     {
       "matches": [
         "https://www.doubao.com/thread/*",
-        "https://www.doubao.com/chat/*"
+        "https://www.doubao.com/chat/*",
+        "https://www.dola.com/chat/*"
       ],
       "js": ["bridge.js"],
       "run_at": "document_start"
@@ -33,6 +35,7 @@
       "matches": [
         "https://www.doubao.com/thread/*",
         "https://www.doubao.com/chat/*",
+        "https://www.dola.com/chat/*",
         "https://www.qianwen.com/chat/*",
         "https://www.qianwen.com/share/chat/*",
         "https://qianwen.my.cn/share/chat/*"

@@ -7,9 +7,16 @@
     let chatImages = [];
     let chatVideos = [];
     let floatingBtnElement = null;
+    let dolaVideoObserver = null;
+    let dolaVideoScanTimer = null;
     let autoDownloadEnabled = false;
+    let dolaVideoDuration = 0;
     const autoDownloadedUrls = new Set();
     const autoDownloadInFlight = new Set();
+    const isDolaChat = window.location.hostname === 'www.dola.com' && window.location.pathname.includes('/chat/');
+    const isDoubaoCompatibleChat = window.location.pathname.includes('/chat/') &&
+        (window.location.hostname.includes('doubao.com') || isDolaChat);
+    const nativeJSONStringify = JSON.stringify;
 
     function loadSettings() {
         const id = `${Date.now()}-${Math.random()}`;
@@ -19,12 +26,64 @@
             if (data.id !== id) return;
             window.removeEventListener('ai-media-extractor-settings-response', onResponse);
             autoDownloadEnabled = Boolean(data.autoDownload);
+            dolaVideoDuration = [15, 30].includes(Number(data.dolaVideoDuration)) ? Number(data.dolaVideoDuration) : 0;
             if (Array.isArray(data.autoDownloadedUrls)) {
                 data.autoDownloadedUrls.forEach(url => { if (typeof url === 'string' && url) autoDownloadedUrls.add(url); });
             }
         };
         window.addEventListener('ai-media-extractor-settings-response', onResponse);
         window.dispatchEvent(new CustomEvent('ai-media-extractor-settings-request', { detail: JSON.stringify({ id }) }));
+    }
+
+    window.addEventListener('ai-media-extractor-auto-download-history-changed', event => {
+        let data;
+        try { data = JSON.parse(event.detail); } catch (_) { return; }
+        autoDownloadedUrls.clear();
+        if (Array.isArray(data.autoDownloadedUrls)) {
+            data.autoDownloadedUrls.forEach(url => { if (typeof url === 'string' && url) autoDownloadedUrls.add(url); });
+        }
+    });
+
+    window.addEventListener('ai-media-extractor-settings-changed', event => {
+        let data;
+        try { data = JSON.parse(event.detail); } catch (_) { return; }
+        if (Object.prototype.hasOwnProperty.call(data, 'dolaVideoDuration')) {
+            dolaVideoDuration = [15, 30].includes(Number(data.dolaVideoDuration)) ? Number(data.dolaVideoDuration) : 0;
+        }
+    });
+
+    function applyDolaVideoDuration(payload) {
+        if (!isDolaChat || !dolaVideoDuration || !payload || typeof payload !== 'object') return false;
+        let changed = false;
+        const visit = value => {
+            if (!value || typeof value !== 'object') return;
+            if (Array.isArray(value)) { value.forEach(visit); return; }
+            const ability = value.chat_ability || (Number(value.ability_type) === 17 ? value : null);
+            if (ability && Number(ability.ability_type) === 17) {
+                let params = ability.ability_param;
+                if (typeof params === 'string') {
+                    try { params = JSON.parse(params); } catch (_) { params = {}; }
+                }
+                if (params && typeof params === 'object') {
+                    params.duration = dolaVideoDuration;
+                    params.model = 'seedance_v2.0';
+                    ability.ability_param = nativeJSONStringify(params);
+                    changed = true;
+                }
+            }
+            Object.values(value).forEach(visit);
+        };
+        visit(payload);
+        return changed;
+    }
+
+    if (isDolaChat) {
+        JSON.stringify = function(value, replacer, space) {
+            if (applyDolaVideoDuration(value)) {
+                console.log(`[AI 素材提取器] JSON.stringify 已注入 Dola ${dolaVideoDuration} 秒参数`);
+            }
+            return nativeJSONStringify.call(JSON, value, replacer, space);
+        };
     }
 
     async function autoDownload(url, type, index) {
@@ -83,15 +142,20 @@
     const originalXHRSend = XMLHttpRequest.prototype.send;
     
     XMLHttpRequest.prototype.open = function(method, url, ...args) {
-        this._url = url;
+        this._url = typeof url === 'string' ? url : url?.href || '';
+        this._method = method;
         return originalXHROpen.apply(this, [method, url, ...args]);
     };
     
     XMLHttpRequest.prototype.send = function(...args) {
         const url = this._url;
+        if (isDolaChat && dolaVideoDuration && String(this._method).toUpperCase() === 'POST' && url.includes('/chat/completion') && typeof args[0] === 'string') {
+            args[0] = patchDolaVideoDuration(args[0]);
+        }
         this.addEventListener('load', function() {
             if (url && (url.includes('/im/chain/single'))) {
                 try {
+                    if (isDolaChat) extractDolaVideosFromResponseText(this.responseText);
                     const data = JSON.parse(this.responseText);
                     
                     const messages = data?.downlink_body?.pull_singe_chain_downlink_body?.messages;
@@ -111,9 +175,30 @@
 
     const originalFetch = window.fetch;
     window.fetch = async function(...args) {
-        const url = args[0];
+        const request = args[0];
+        // fetch accepts strings, URL instances, and Request instances. Dola's
+        // telemetry uses Request instances, so normalize only for inspection.
+        const url = typeof request === 'string'
+            ? request
+            : request instanceof URL
+                ? request.href
+                : typeof request?.url === 'string'
+                    ? request.url
+                    : '';
+
+        if (isDolaChat && dolaVideoDuration && url.includes('/chat/completion')) {
+            const init = args[1];
+            if (init && typeof init.body === 'string') {
+                const body = patchDolaVideoDuration(init.body);
+                if (body !== init.body) args[1] = { ...init, body };
+            } else if (request instanceof Request && request.method === 'POST') {
+                const body = await request.clone().text();
+                const patchedBody = patchDolaVideoDuration(body);
+                if (patchedBody !== body) args[0] = new Request(request, { body: patchedBody });
+            }
+        }
         
-        if (url && (typeof url === 'string') && url.includes('qianwen.com/api/v1/session/msg/list')) {
+        if (url.includes('qianwen.com/api/v1/session/msg/list')) {
             console.log('[AI 素材提取器] 检测到千问 session msg list 请求:', url);
             const response = await originalFetch.apply(this, args);
             response.clone().json().then(data => {
@@ -126,7 +211,7 @@
             return response;
         }
 
-        if (url && (typeof url === 'string') && url.includes('qianwen.com/api/v1/share/info')) {
+        if (url.includes('qianwen.com/api/v1/share/info')) {
             console.log('[AI 素材提取器] 检测到千问 share chat 请求:', url);
             const response = await originalFetch.apply(this, args);
             response.clone().json().then(data => {
@@ -139,7 +224,7 @@
             return response;
         }
 
-        if (url && (typeof url === 'string') && url.includes('qianwen.com/api/v1/chat/snap')) {
+        if (url.includes('qianwen.com/api/v1/chat/snap')) {
             console.log('[AI 素材提取器] 检测到千问 EventStream 请求:', url);
             
             const response = await originalFetch.apply(this, args);
@@ -187,8 +272,14 @@
                 statusText: response.statusText
             });
         }
+
+        if (isDolaChat && url.includes('/im/chain/single')) {
+            const response = await originalFetch.apply(this, args);
+            response.clone().text().then(extractDolaVideosFromResponseText).catch(() => {});
+            return response;
+        }
         
-        if (url && url.includes('/chat/completion')) {
+        if (url.includes('/chat/completion')) {
             console.log('[AI 素材提取器] 检测到 EventStream 请求:', url);
             
             const response = await originalFetch.apply(this, args);
@@ -356,7 +447,7 @@
 
             
             for (const creation of creations) {
-                if (creation?.video) {
+                if (creation?.video && !isDolaChat) {
                     const vid = creation.video.vid;
                     getDoubaoVideoInfo(vid).then(info => addChatVideo(info));
                 }else{
@@ -547,7 +638,7 @@
                         const creationBlock = content.content?.creation_block;
                         if (!creationBlock || !Array.isArray(creationBlock.creations)) continue;
                         for (const creation of creationBlock.creations) {
-                            if (creation?.video) {
+                            if (creation?.video && !isDolaChat) {
                                 const vid = creation.video.vid;
                                 getDoubaoVideoInfo(vid).then(info => addChatVideo(info));
                             }else{
@@ -615,7 +706,7 @@
                                             : rawContent;
                                         if (contentData.creation_block?.creations) {
                                             for (const creation of contentData.creation_block.creations) {
-                                                if (creation?.video) {
+                                                if (creation?.video && !isDolaChat) {
                                                     const vid = creation.video.vid;
                                                     getDoubaoVideoInfo(vid).then(info => addChatVideo(info));
                                                 }else{
@@ -694,13 +785,129 @@
         return videos;
     }
 
+    function extractDolaVideos() {
+        const videos = [];
+        const seen = new Set();
+        document.querySelectorAll('[class*="block-video"] video, video[mediatype="video"]').forEach((video, index) => {
+            const url = video.currentSrc || video.src;
+            if (!url || seen.has(url)) return;
+            seen.add(url);
+            if (isDolaWatermarkedVideoUrl(url)) {
+                console.log('[AI 素材提取器] 已忽略 Dola 页面带水印预览视频');
+                return;
+            }
+
+            const container = video.closest('[class*="block-video"]');
+            const durationText = container?.querySelector('.time-duration')?.textContent || '';
+            const durationParts = durationText.match(/(\d+):(\d{2})/);
+            const duration = Number.isFinite(video.duration) ? video.duration : durationParts
+                ? Number(durationParts[1]) * 60 + Number(durationParts[2])
+                : 0;
+            const poster = container?.querySelector('img')?.currentSrc || container?.querySelector('img')?.src || video.poster || '';
+            videos.push({
+                vid: video.dataset.xgplayerid || `dola-video-${index}`,
+                url,
+                width: video.videoWidth || 0,
+                height: video.videoHeight || 0,
+                duration,
+                poster_url: poster,
+            });
+        });
+        console.log('[AI 素材提取器] Dola 页面视频，共', videos.length, '个');
+        return videos;
+    }
+
+    function cleanDolaVideoUrl(url) {
+        return url.replace(/\\u002F/gi, '/').replace(/\\\//g, '/').replace(/&amp;/g, '&')
+            .replace(/([?&])lr=[^&]*/i, '$1lr=unwatermarked');
+    }
+
+    function isDolaWatermarkedVideoUrl(url) {
+        return /[?&]lr=(?:cici_ai|[^&]*watermark)/i.test(url);
+    }
+
+    function patchDolaVideoDuration(body) {
+        try {
+            const payload = JSON.parse(body);
+            const changed = applyDolaVideoDuration(payload);
+            if (changed) console.log(`[AI 素材提取器] 已请求 Dola ${dolaVideoDuration} 秒视频`);
+            return changed ? nativeJSONStringify(payload) : body;
+        } catch (_) {
+            return body;
+        }
+    }
+
+    function decodeDolaVideoUrl(value) {
+        const token = cleanDolaVideoUrl(String(value || ''));
+        if (/^https?:\/\//i.test(token)) return token;
+        const decoded = dbUrlFromBytes(dbTokenBytes(token));
+        return decoded ? cleanDolaVideoUrl(decoded) : '';
+    }
+
+    function extractDolaVideosFromResponseText(responseText) {
+        if (!isDolaChat || typeof responseText !== 'string') return;
+        const seen = new Set();
+        // Dola keeps the original video URL in a Base64 main_url/man_url field.
+        // Match normal JSON and JSON embedded as an escaped string.
+        const patterns = [
+            /"(?:main_url|man_url)"\s*:\s*"([A-Za-z0-9+/_=-]{80,})"/g,
+            /\\"(?:main_url|man_url)\\"\s*:\s*\\"([A-Za-z0-9+/_=-]{80,})\\"/g,
+        ];
+        for (const pattern of patterns) {
+            let match;
+            while ((match = pattern.exec(responseText)) !== null) {
+                const url = decodeDolaVideoUrl(match[1]);
+                if (!url || seen.has(url)) continue;
+                seen.add(url);
+                addChatVideo({ vid: `dola-response-${url}`, url, width: 0, height: 0, duration: 0, poster_url: '', source: 'dola-clean' });
+                console.log('[AI 素材提取器] 从 Dola 响应提取视频:', url);
+            }
+        }
+    }
+
+    function scanDolaVideos() {
+        if (!isDolaChat) return;
+        extractDolaVideos().forEach(addChatVideo);
+    }
+
+    function startDolaVideoObserver() {
+        if (!isDolaChat || dolaVideoObserver || !document.documentElement) return;
+
+        const scheduleScan = () => {
+            clearTimeout(dolaVideoScanTimer);
+            dolaVideoScanTimer = setTimeout(scanDolaVideos, 80);
+        };
+
+        dolaVideoObserver = new MutationObserver(mutations => {
+            for (const mutation of mutations) {
+                if ((mutation.type === 'attributes' && mutation.target instanceof HTMLVideoElement) || [...mutation.addedNodes].some(node =>
+                    node.nodeType === Node.ELEMENT_NODE &&
+                    (node.matches?.('video') || node.querySelector?.('video'))
+                )) {
+                    scheduleScan();
+                    return;
+                }
+            }
+        });
+        dolaVideoObserver.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['src'],
+        });
+
+        // Dola renders history asynchronously and may attach video sources after
+        // the initial page load; these scans cover the first virtual-list render.
+        [0, 500, 1500, 3000].forEach(delay => setTimeout(scanDolaVideos, delay));
+    }
+
     function extractImages() {
         if (window.location.hostname === 'qianwen.my.cn' && window.location.pathname.includes('/share/chat/')) {
             chatImages = extractQianwenMyShareImages();
             return chatImages;
         }
-        if (window.location.hostname.includes('doubao.com') && window.location.pathname.includes('/chat/')) {
-            console.log('[AI 素材提取器] 豆包聊天界面，返回已缓存的', chatImages.length, '张图片');
+        if (isDoubaoCompatibleChat) {
+            console.log('[AI 素材提取器] 豆包兼容聊天界面，返回已缓存的', chatImages.length, '张图片');
             return chatImages;
         } else if (window.location.hostname.includes('qianwen.com') && window.location.pathname.includes('/chat/')) {
             return chatImages;
@@ -713,6 +920,10 @@
     }
 
     function extractVideos() {
+        if (isDolaChat) {
+            scanDolaVideos();
+            return chatVideos;
+        }
         if ((window.location.hostname === 'qianwen.my.cn' && window.location.pathname.includes('/share/chat/')) ||
             (window.location.hostname.includes('qianwen.com') && window.location.pathname.includes('/chat/'))) {
             chatVideos = extractQianwenMyShareVideos();
@@ -1448,6 +1659,7 @@
     function initScript() {
         console.log('[AI 素材提取器] 脚本已加载');
         loadSettings();
+        startDolaVideoObserver();
         
         if (window.location.pathname.includes('/chat/')) {
             createFloatingButton();
