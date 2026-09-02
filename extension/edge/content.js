@@ -13,6 +13,7 @@
     let dolaVideoDuration = 0;
     const autoDownloadedUrls = new Set();
     const autoDownloadInFlight = new Set();
+    let lastDownloadFailures = [];
     const isDolaChat = window.location.hostname === 'www.dola.com' && window.location.pathname.includes('/chat/');
     const isDoubaoCompatibleChat = window.location.pathname.includes('/chat/') &&
         (window.location.hostname.includes('doubao.com') || isDolaChat);
@@ -66,7 +67,8 @@
                 }
                 if (params && typeof params === 'object') {
                     params.duration = dolaVideoDuration;
-                    params.model = 'seedance_v2.0';
+                    // Dola exposes the 2.5 model for the 30-second option.
+                    params.model = dolaVideoDuration === 30 ? 'seedance_v2.5' : 'seedance_v2.0';
                     ability.ability_param = nativeJSONStringify(params);
                     changed = true;
                 }
@@ -86,12 +88,38 @@
         };
     }
 
+    function getSiteName() {
+        if (location.hostname.includes('dola.com')) return 'Dola';
+        if (location.hostname.includes('qianwen')) return '千问';
+        return '豆包';
+    }
+
+    function getConversationTitle() {
+        const title = document.title
+            .replace(/\s*[|｜-]\s*(豆包|Dola|通义千问|千问).*$/i, '')
+            .replace(/^(豆包|Dola|通义千问|千问)\s*[-|｜:]?\s*/i, '')
+            .trim();
+        return title && title.length < 80 ? title : 'AI素材';
+    }
+
+    function safeFilename(value) {
+        return String(value || 'AI素材')
+            .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 80) || 'AI素材';
+    }
+
+    function mediaFilename(type, index) {
+        const extension = type === 'video' ? 'mp4' : 'png';
+        return `${safeFilename(getSiteName())}_${safeFilename(getConversationTitle())}_${String(index).padStart(2, '0')}.${extension}`;
+    }
+
     async function autoDownload(url, type, index) {
         if (!autoDownloadEnabled || !url || autoDownloadedUrls.has(url) || autoDownloadInFlight.has(url)) return;
         autoDownloadInFlight.add(url);
-        const extension = type === 'video' ? 'mp4' : 'png';
         try {
-            const downloaded = await downloadImage(url, `ai_media_auto_${type}_${index}.${extension}`, false);
+            const downloaded = await downloadImage(url, mediaFilename(type, index), false);
             if (!downloaded || autoDownloadedUrls.has(url)) return;
             autoDownloadedUrls.add(url);
             window.dispatchEvent(new CustomEvent('ai-media-extractor-auto-download-mark', { detail: JSON.stringify({ url }) }));
@@ -933,12 +961,74 @@
         return chatVideos;
     }
 
-    async function downloadImage(url, filename, showError = true) {
+    async function fetchBlob(url, onProgress = null) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.body || typeof response.body.getReader !== 'function') {
+            const blob = await response.blob();
+            if (onProgress) onProgress(100);
+            return blob;
+        }
+        const reader = response.body.getReader();
+        const chunks = [];
+        const total = Number(response.headers.get('content-length')) || 0;
+        let loaded = 0;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            loaded += value.byteLength;
+            if (onProgress) onProgress(total ? Math.round(loaded / total * 100) : null);
+        }
+        return new Blob(chunks, { type: response.headers.get('content-type') || 'application/octet-stream' });
+    }
+
+    function crc32(bytes) {
+        let crc = 0xffffffff;
+        for (const byte of bytes) {
+            crc ^= byte;
+            for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    async function createZip(entries, onProgress = null) {
+        const encoder = new TextEncoder();
+        const localParts = [];
+        const centralParts = [];
+        let offset = 0;
+        let completed = 0;
+        const chunks = [];
+        for (const entry of entries) {
+            const data = new Uint8Array(await fetchBlob(entry.url, percent => {
+                if (onProgress) onProgress(percent === null ? null : Math.round((completed + percent / 100) / entries.length * 100));
+            }).then(blob => blob.arrayBuffer()));
+            const name = encoder.encode(entry.filename);
+            const crc = crc32(data);
+            const header = new Uint8Array(30 + name.length);
+            const view = new DataView(header.buffer);
+            view.setUint32(0, 0x04034b50, true); view.setUint16(4, 20, true); view.setUint16(6, 0x800, true);
+            view.setUint16(8, 0, true); view.setUint32(14, crc, true); view.setUint32(18, data.length, true); view.setUint32(22, data.length, true);
+            view.setUint16(26, name.length, true); header.set(name, 30);
+            localParts.push(header, data);
+            const central = new Uint8Array(46 + name.length);
+            const centralView = new DataView(central.buffer);
+            centralView.setUint32(0, 0x02014b50, true); centralView.setUint16(4, 20, true); centralView.setUint16(6, 20, true); centralView.setUint16(8, 0x800, true);
+            centralView.setUint32(16, crc, true); centralView.setUint32(20, data.length, true); centralView.setUint32(24, data.length, true); centralView.setUint16(28, name.length, true); centralView.setUint32(42, offset, true); central.set(name, 46);
+            centralParts.push(central); offset += header.length + data.length; completed++;
+        }
+        const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+        const end = new Uint8Array(22); const endView = new DataView(end.buffer);
+        endView.setUint32(0, 0x06054b50, true); endView.setUint16(8, entries.length, true); endView.setUint16(10, entries.length, true); endView.setUint32(12, centralSize, true); endView.setUint32(16, offset, true);
+        chunks.push(...localParts, ...centralParts, end);
+        return new Blob(chunks, { type: 'application/zip' });
+    }
+
+    async function downloadImage(url, filename, showError = true, onProgress = null) {
         try {
             console.log('[AI 素材提取器] 开始下载:', url);
             
-            const response = await fetch(url);
-            const blob = await response.blob();
+            const blob = await fetchBlob(url, onProgress);
             
             const blobUrl = URL.createObjectURL(blob);
             
@@ -955,7 +1045,7 @@
             return true;
         } catch (error) {
             console.error('[AI 素材提取器] 下载失败:', error);
-            if (showError) alert('下载失败，请重试');
+            if (showError) alert(`下载失败：${error?.message || '网络错误'}，请重试`);
             return false;
         }
     }
@@ -1083,7 +1173,10 @@
                 .modal-header-left {
                     display: flex;
                     flex-direction: column;
+                    min-width: 0;
                 }
+
+                .conversation-meta { margin-top: 5px; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8a8a8a; font-size: 12px; }
 
                 .modal-header-actions {
                     display: flex;
@@ -1185,6 +1278,15 @@
                 .media-card:hover {
                     border-color: #1f1f1f;
                 }
+
+                .media-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #eeeeee; }
+                .filter-group { display: flex; gap: 4px; }
+                .filter-btn { padding: 5px 10px; border: 1px solid #dddddd; border-radius: 5px; background: #fff; color: #666; font-size: 12px; cursor: pointer; }
+                .filter-btn.active, .filter-btn:hover { border-color: #222; color: #222; background: #f7f7f7; }
+                .refresh-btn { padding: 5px 10px; border: 1px solid #dddddd; border-radius: 5px; background: #fff; color: #555; font-size: 12px; cursor: pointer; }
+                .refresh-btn:hover { border-color: #222; color: #222; }
+                .download-status { min-height: 18px; margin: 0 0 12px; color: #666; font-size: 12px; }
+                .download-status.error { color: #b42318; }
 
                 .media-card.selected {
                     border-color: #1f1f1f;
@@ -1352,6 +1454,8 @@
                     gap: 12px;
                     background: #fafafa;
                 }
+
+                .modal-footer .footer-link { cursor: pointer; }
                 
                 .footer-divider {
                     width: 1px;
@@ -1400,19 +1504,31 @@
                     <div class="modal-header">
                         <div class="modal-header-left">
                             <h3>素材提取器</h3>
-                            <div class="subtitle" id="image-subtitle">共 0 张图片</div>
+                            <div class="subtitle" id="image-subtitle">共 0 个素材</div>
+                            <div class="conversation-meta" id="conversation-meta" title=""></div>
                         </div>
                         <div class="modal-header-actions">
                             <button class="batch-btn" id="select-all-btn" type="button">全选</button>
                             <button class="batch-btn primary" id="batch-download-btn" type="button" disabled>下载所选 (0)</button>
+                            <button class="batch-btn" id="zip-download-btn" type="button" disabled>下载全部 ZIP</button>
                             <button class="close-btn" type="button">×</button>
                         </div>
                     </div>
                     <div class="modal-body">
+                        <div class="media-toolbar">
+                            <div class="filter-group" role="group" aria-label="素材筛选">
+                                <button class="filter-btn active" type="button" data-filter="all">全部</button>
+                                <button class="filter-btn" type="button" data-filter="image">图片</button>
+                                <button class="filter-btn" type="button" data-filter="video">视频</button>
+                            </div>
+                            <button class="refresh-btn" id="refresh-media-btn" type="button">重新扫描</button>
+                        </div>
+                        <div class="download-status" id="download-status" aria-live="polite"></div>
                         <div class="media-grid" id="media-container"></div>
                     </div>
                     <div class="modal-footer">
                         <span class="footer-text">本地扩展</span>
+                        <a class="footer-link" href="https://github.com/scj725/ai-media-extractor" target="_blank" rel="noreferrer">在 GitHub 上支持项目</a>
                         <!--
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -1436,13 +1552,23 @@
         const closeBtn = modal.querySelector('.close-btn');
         const mediaContainer = document.getElementById('media-container');
         const imageSubtitle = document.getElementById('image-subtitle');
+        const conversationMeta = document.getElementById('conversation-meta');
+        const downloadStatus = document.getElementById('download-status');
+        const refreshMediaBtn = document.getElementById('refresh-media-btn');
         const selectAllBtn = document.getElementById('select-all-btn');
         const batchDownloadBtn = document.getElementById('batch-download-btn');
+        const zipDownloadBtn = document.getElementById('zip-download-btn');
 
         let currentImages = [];
         let currentVideos = [];
         const selectedUrls = new Set();
         let batchDownloading = false;
+        let mediaFilter = 'all';
+        try {
+            const savedFilter = localStorage.getItem('ai-media-extractor-filter');
+            if (['all', 'image', 'video'].includes(savedFilter)) mediaFilter = savedFilter;
+        } catch (_) {}
+        modal.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === mediaFilter));
 
         function getMediaItems(images = currentImages, videos = currentVideos) {
             return [
@@ -1451,17 +1577,23 @@
             ];
         }
 
-        function updateBatchControls() {
+        function getVisibleMediaItems() {
             const items = getMediaItems();
+            return mediaFilter === 'all' ? items : items.filter(item => item.type === mediaFilter);
+        }
+
+        function updateBatchControls() {
+            const items = getVisibleMediaItems();
             const availableUrls = new Set(items.map(item => item.data.url));
             [...selectedUrls].forEach(url => {
                 if (!availableUrls.has(url)) selectedUrls.delete(url);
             });
             const selectedCount = selectedUrls.size;
-            const allSelected = items.length > 0 && selectedCount === items.length;
+            const allSelected = items.length > 0 && items.every(item => selectedUrls.has(item.data.url));
             selectAllBtn.textContent = allSelected ? '取消全选' : '全选';
             selectAllBtn.disabled = batchDownloading || items.length === 0;
             batchDownloadBtn.disabled = batchDownloading || selectedCount === 0;
+            zipDownloadBtn.disabled = batchDownloading || getMediaItems().length === 0;
             batchDownloadBtn.textContent = batchDownloading ? '正在下载…' : `下载所选 (${selectedCount})`;
         }
 
@@ -1480,15 +1612,18 @@
             currentVideos = videos;
             const totalCount = images.length + videos.length;
             floatingBtn.querySelector('.count').textContent = totalCount;
-            imageSubtitle.textContent = `共 ${images.length} 张图片 · ${videos.length} 个视频`;
+            imageSubtitle.textContent = `共 ${totalCount} 个素材 · ${images.length} 张图片 · ${videos.length} 个视频`;
+            conversationMeta.textContent = `${getSiteName()} · ${getConversationTitle()}`;
+            conversationMeta.title = conversationMeta.textContent;
             return { images, videos };
         }
 
         function renderMedia(images, videos) {
-            const mediaItems = getMediaItems(images, videos);
+            const allMediaItems = getMediaItems(images, videos);
+            const mediaItems = mediaFilter === 'all' ? allMediaItems : allMediaItems.filter(item => item.type === mediaFilter);
 
             if (mediaItems.length === 0) {
-                mediaContainer.innerHTML = '';
+                mediaContainer.innerHTML = allMediaItems.length ? '<div class="empty-state"><div class="empty-state-icon">🔎</div><div class="empty-state-text">这个筛选条件下没有素材</div></div>' : '';
                 updateBatchControls();
                 return;
             }
@@ -1551,27 +1686,39 @@
                 });
             });
 
+            mediaContainer.querySelectorAll('.media-preview img').forEach(image => image.addEventListener('dblclick', event => {
+                event.stopPropagation();
+                window.open(image.currentSrc || image.src, '_blank', 'noopener,noreferrer');
+            }));
+
             mediaContainer.querySelectorAll('.btn-media-download').forEach(btn => {
-                btn.addEventListener('click', (e) => {
+                btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     const type = btn.dataset.type;
-                    const url = btn.dataset.url;
+                    const mediaCard = btn.closest('.media-card');
+                    const video = mediaCard?.querySelector('video');
+                    const url = video?.currentSrc || video?.src || btn.dataset.url;
                     const index = parseInt(btn.dataset.index, 10) + 1;
-                    const filename = type === 'video' ? `ai_media_video_${index}.mp4` : `ai_media_image_${index}.png`;
-                    downloadImage(url, filename);
-                    btn.classList.add('success');
-                    btn.textContent = '✓ 已下载';
-                    setTimeout(() => {
-                        btn.classList.remove('success');
-                        btn.textContent = '下载';
-                    }, 2000);
+                    btn.disabled = true;
+                    btn.textContent = '下载中…';
+                    downloadStatus.textContent = '正在下载…';
+                    const downloaded = await downloadImage(url, mediaFilename(type, index), true, percent => {
+                        downloadStatus.textContent = percent === null ? '正在下载…' : `正在下载… ${percent}%`;
+                    });
+                    btn.disabled = false;
+                    btn.classList.toggle('success', downloaded);
+                    btn.textContent = downloaded ? '✓ 已下载' : '重试下载';
+                    downloadStatus.textContent = downloaded ? '下载完成' : '下载失败，可点击重试';
+                    if (downloaded) setTimeout(() => { btn.classList.remove('success'); btn.textContent = '下载'; downloadStatus.textContent = ''; }, 2200);
                 });
             });
 
             mediaContainer.querySelectorAll('.btn-media-copy').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    const url = btn.dataset.url;
+                    const mediaCard = btn.closest('.media-card');
+                    const video = mediaCard?.querySelector('video');
+                    const url = video?.currentSrc || video?.src || btn.dataset.url;
                     try {
                         await navigator.clipboard.writeText(url);
                         btn.classList.add('success');
@@ -1589,7 +1736,7 @@
         }
 
         selectAllBtn.addEventListener('click', () => {
-            const items = getMediaItems();
+            const items = getVisibleMediaItems();
             const allSelected = items.length > 0 && items.every(item => selectedUrls.has(item.data.url));
             items.forEach(item => {
                 if (allSelected) selectedUrls.delete(item.data.url);
@@ -1605,16 +1752,61 @@
             batchDownloading = true;
             updateBatchControls();
             let successCount = 0;
+            lastDownloadFailures = [];
             for (const item of selectedItems) {
-                const extension = item.type === 'video' ? 'mp4' : 'png';
-                const filename = `ai_media_${item.type}_${item.index + 1}.${extension}`;
-                if (await downloadImage(item.data.url, filename, false)) successCount++;
+                downloadStatus.textContent = `正在下载 ${successCount + 1}/${selectedItems.length}…`;
+                if (await downloadImage(item.data.url, mediaFilename(item.type, item.index + 1), false, percent => {
+                    downloadStatus.textContent = percent === null ? `正在下载 ${successCount + 1}/${selectedItems.length}…` : `正在下载 ${successCount + 1}/${selectedItems.length}… ${percent}%`;
+                })) successCount++;
+                else lastDownloadFailures.push(item);
             }
             batchDownloading = false;
             updateBatchControls();
-            if (successCount !== selectedItems.length) {
-                alert(`批量下载完成：成功 ${successCount} 个，失败 ${selectedItems.length - successCount} 个。`);
+            downloadStatus.classList.toggle('error', lastDownloadFailures.length > 0);
+            downloadStatus.textContent = lastDownloadFailures.length ? `完成：成功 ${successCount} 个，失败 ${lastDownloadFailures.length} 个。请点击失败项目重试。` : `全部下载完成，共 ${successCount} 个。`;
+        });
+
+        zipDownloadBtn.addEventListener('click', async () => {
+            if (batchDownloading) return;
+            const items = getMediaItems();
+            if (!items.length) return;
+            batchDownloading = true;
+            updateBatchControls();
+            downloadStatus.classList.remove('error');
+            try {
+                const entries = items.map(item => ({ url: item.data.url, filename: mediaFilename(item.type, item.index + 1) }));
+                const zipBlob = await createZip(entries, percent => { downloadStatus.textContent = percent === null ? '正在制作 ZIP…' : `正在制作 ZIP… ${percent}%`; });
+                const zipUrl = URL.createObjectURL(zipBlob);
+                const link = document.createElement('a');
+                link.href = zipUrl;
+                link.download = `${safeFilename(getSiteName())}_${safeFilename(getConversationTitle())}.zip`;
+                document.body.appendChild(link); link.click(); link.remove();
+                setTimeout(() => URL.revokeObjectURL(zipUrl), 1000);
+                downloadStatus.textContent = `ZIP 下载已开始，共 ${items.length} 个素材。`;
+            } catch (error) {
+                console.error('[AI 素材提取器] ZIP 下载失败:', error);
+                downloadStatus.classList.add('error');
+                downloadStatus.textContent = `ZIP 下载失败：${error?.message || '网络错误'}。`;
+            } finally {
+                batchDownloading = false;
+                updateBatchControls();
             }
+        });
+
+        modal.querySelectorAll('.filter-btn').forEach(filterBtn => filterBtn.addEventListener('click', () => {
+            mediaFilter = filterBtn.dataset.filter;
+            try { localStorage.setItem('ai-media-extractor-filter', mediaFilter); } catch (_) {}
+            modal.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn === filterBtn));
+            renderMedia(currentImages, currentVideos);
+        }));
+
+        refreshMediaBtn.addEventListener('click', () => {
+            refreshMediaBtn.disabled = true;
+            downloadStatus.classList.remove('error');
+            downloadStatus.textContent = '正在重新扫描页面…';
+            const { images, videos } = updateImageCount();
+            renderMedia(images, videos);
+            setTimeout(() => { refreshMediaBtn.disabled = false; downloadStatus.textContent = ''; }, 600);
         });
 
         window.addEventListener('ai-media-extractor-media-added', () => {
@@ -1647,6 +1839,20 @@
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.remove('show');
+            }
+        });
+
+        document.addEventListener('keydown', event => {
+            if (!modal.classList.contains('show')) return;
+            if (event.key === 'Escape') {
+                modal.classList.remove('show');
+                return;
+            }
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+                event.preventDefault();
+                const items = getVisibleMediaItems();
+                items.forEach(item => selectedUrls.add(item.data.url));
+                renderMedia(currentImages, currentVideos);
             }
         });
 

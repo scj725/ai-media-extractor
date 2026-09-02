@@ -1,0 +1,17 @@
+name: 功能建议
+description: 提议一个能改善扩展体验的功能
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      placeholder: 描述当前流程中最麻烦的部分
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+    validations:
+      required: true

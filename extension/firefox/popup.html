@@ -1,209 +1,52 @@
-﻿<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>AI 素材提取器</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            width: 300px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #ffffff;
-            color: #1f1f1f;
-        }
-
-        .header {
-            padding: 20px 20px 16px;
-            text-align: center;
-            background: linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%);
-            border-bottom: 1px solid #e4e6f5;
-        }
-
-        .header-icon {
-            font-size: 30px;
-            margin-bottom: 7px;
-        }
-
-        .header h1 {
-            font-size: 17px;
-            font-weight: 700;
-            color: #1f1f1f;
-            margin-bottom: 3px;
-        }
-
-        .header-sub {
-            font-size: 12px;
-            color: #8b8b8b;
-        }
-
-        .body {
-            padding: 16px 16px 12px;
-        }
-
-        .steps {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .step {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 9px 12px;
-            background: #fafafa;
-            border: 1px solid #f0f0f0;
-            border-radius: 8px;
-        }
-
-        .step-num {
-            min-width: 20px;
-            height: 20px;
-            background: #1f1f1f;
-            color: #ffffff;
-            border-radius: 50%;
-            font-size: 11px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .step-text {
-            font-size: 13px;
-            color: #3b3b3b;
-            line-height: 1.4;
-        }
-
-        .step-text strong {
-            color: #1f1f1f;
-        }
-
-        .github-wrap {
-            text-align: center;
-            margin-top: 14px;
-        }
-
-        .link-button {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 16px;
-            background: #f7f7f7;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            color: #1f1f1f;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .link-button:hover {
-            background: #ffffff;
-            border-color: #1f1f1f;
-        }
-
-        .link-button svg {
-            width: 15px;
-            height: 15px;
-        }
-
-        .footer {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 10px 16px;
-            border-top: 1px solid #e0e0e0;
-            background: #fafafa;
-        }
-
-        .footer-text {
-            font-size: 12px;
-            color: #b0b0b0;
-        }
-
-        .header-version {
-            font-size: 12px;
-            font-weight: 400;
-            color: #b0b0b0;
-            vertical-align: middle;
-            margin-left: 5px;
-        }
-
-        .settings {
-            margin-top: 14px;
-            padding: 12px;
-            border: 1px solid #e5e5e5;
-            border-radius: 8px;
-            background: #fafafa;
-        }
-
-        .setting-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-        .setting-row input { margin-top: 2px; accent-color: #1f1f1f; }
-        .setting-title { font-size: 13px; font-weight: 600; }
-        .setting-desc { margin-top: 3px; font-size: 11px; line-height: 1.4; color: #777; }
-        .setting-status { margin-top: 8px; font-size: 11px; color: #4b7f52; min-height: 14px; }
-        .clear-history { margin-top: 9px; padding: 0; border: 0; background: transparent; color: #777; font-size: 11px; cursor: pointer; text-decoration: underline; }
-        .clear-history:hover { color: #1f1f1f; }
-        .duration-select { width: 100%; margin-top: 5px; padding: 5px 7px; border: 1px solid #d8d8d8; border-radius: 5px; background: #fff; color: #333; font-size: 12px; }
+        * { box-sizing: border-box; }
+        body { width: 320px; margin: 0; color: #202124; background: #fff; font: 13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+        header { padding: 18px 18px 15px; border-bottom: 1px solid #ececec; }
+        .brand { display: flex; align-items: center; gap: 10px; }
+        .brand-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: #202124; color: white; font-size: 18px; }
+        h1 { margin: 0; font-size: 16px; } .version { color: #999; font-size: 11px; font-weight: 400; }
+        .subtitle { margin: 5px 0 0 44px; color: #777; font-size: 12px; }
+        main { padding: 15px 16px; }
+        .section { padding: 12px; border: 1px solid #e7e7e7; border-radius: 8px; background: #fafafa; }
+        .section + .section { margin-top: 10px; }
+        .row { display: flex; align-items: flex-start; gap: 9px; }
+        .row + .row { margin-top: 13px; }
+        input[type=checkbox] { width: 16px; height: 16px; margin: 1px 0 0; accent-color: #202124; }
+        .title { font-weight: 600; } .desc { margin-top: 3px; color: #777; font-size: 11px; line-height: 1.45; }
+        select { width: 100%; margin-top: 7px; padding: 6px 7px; border: 1px solid #d5d5d5; border-radius: 5px; background: #fff; color: #333; }
+        .status { min-height: 16px; margin-top: 10px; color: #38764a; font-size: 11px; }
+        .links { display: flex; gap: 8px; }
+        .link { flex: 1; padding: 8px 5px; border: 1px solid #ddd; border-radius: 6px; color: #333; text-align: center; text-decoration: none; font-size: 12px; }
+        .link:hover { border-color: #202124; background: #fff; }
+        button.link { cursor: pointer; background: #fff; }
+        footer { padding: 10px 16px 13px; color: #aaa; text-align: center; font-size: 11px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-icon">📷</div>
-            <h1>AI 素材提取器<span class="header-version">v0.5.6</span></h1>
-        <p class="header-sub">无水印图片/视频提取工具</p>
-    </div>
-
-    <div class="body">
-        <ul class="steps">
-            <li class="step">
-                <span class="step-num">1</span>
-                <span class="step-text">访问<strong>豆包</strong>、<strong>Dola</strong>或<strong>千问</strong>对话页面</span>
-            </li>
-            <li class="step">
-                <span class="step-num">2</span>
-                <span class="step-text">使用AI生成图片或视频，插件自动解析出无水印的图片/视频</span>
-            </li>
-            <li class="step">
-                <span class="step-num">3</span>
-                <span class="step-text">点击右下角 📷 按钮，可单独下载或勾选批量下载素材</span>
-            </li>
-        </ul>
-
-        <div class="settings">
-            <label class="setting-row">
-                <input id="auto-download" type="checkbox">
-                <span><span class="setting-title">检测到新素材时自动下载</span><br><span class="setting-desc">默认关闭。只处理本次页面中新发现的图片和视频。</span></span>
-            </label>
-            <label class="setting-row" style="margin-top: 11px;">
-                <span><span class="setting-title">Dola 视频时长</span><br><span class="setting-desc">仅在 Dola 生成视频时生效；30 秒取决于模型和账号是否开放。</span>
-                    <select id="dola-video-duration" class="duration-select" aria-label="Dola 视频时长">
-                        <option value="0">按平台默认时长</option>
-                        <option value="15">15 秒</option>
-                        <option value="30">30 秒（实验）</option>
-                    </select>
-                </span>
-            </label>
-            <button id="clear-history" class="clear-history" type="button">清除自动下载记录</button>
-            <div id="setting-status" class="setting-status" aria-live="polite"></div>
-        </div>
-
-    </div>
-
-    <div class="footer">
-        <span class="footer-text">AI 素材提取器</span>
-    </div>
+    <header>
+<div class="brand"><div class="brand-icon" aria-hidden="true">▣</div><h1>AI 素材提取器 <span class="version">v0.6.2</span></h1></div>
+        <p class="subtitle">提取图片与视频，快速保存到本地</p>
+    </header>
+    <main>
+        <section class="section">
+            <label class="row"><input id="auto-download" type="checkbox"><span><span class="title">自动下载新素材</span><br><span class="desc">检测到新图片或视频后自动保存，默认关闭。</span></span></label>
+            <label class="row"><span style="width:100%"><span class="title">Dola 视频时长</span><br><span class="desc">仅对 Dola 生成请求生效，30 秒取决于账号和模型。</span><select id="dola-video-duration" aria-label="Dola 视频时长"><option value="0">按平台默认时长</option><option value="15">15 秒</option><option value="30">30 秒（实验）</option></select></span></label>
+            <button id="clear-history" class="link" type="button">清除自动下载记录</button>
+            <div id="setting-status" class="status" aria-live="polite"></div>
+        </section>
+        <section class="section">
+            <div class="title">支持的平台</div>
+            <div class="desc">豆包 · Dola · 千问</div>
+            <div class="links" style="margin-top:10px"><a class="link" href="https://github.com/scj725/ai-media-extractor" target="_blank" rel="noreferrer">GitHub 项目</a><a class="link" href="https://github.com/scj725/ai-media-extractor/issues" target="_blank" rel="noreferrer">反馈问题</a></div>
+        </section>
+    </main>
+    <footer>所有处理均在浏览器本地完成</footer>
     <script src="popup.js"></script>
 </body>
 </html>

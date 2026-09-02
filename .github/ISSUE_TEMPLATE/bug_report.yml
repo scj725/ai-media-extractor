@@ -1,0 +1,25 @@
+name: 问题反馈
+description: 报告扩展无法提取或下载的问题
+title: "[Bug] "
+body:
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器及版本
+      placeholder: Edge 140 / Firefox 128
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: 目标平台和页面类型
+      placeholder: 豆包 chat / 千问 share
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请勿粘贴 Cookie、Token 或聊天内容。
+    validations:
+      required: true

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Media Extractor",
-  "version": "0.5.6",
+  "version": "0.6.2",
   "description": "Extract media assets and optionally auto-download newly generated images and videos.",
   "icons": {
     "16": "icons/icon16.png",

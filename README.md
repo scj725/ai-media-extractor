@@ -1,196 +1,78 @@
 # AI Media Extractor
 
-从豆包、Dola 和千问对话、分享页面提取图片与视频资源的本地工具。项目提供本地 Web/API 服务、Chrome/Edge/Firefox 扩展和 Tampermonkey 脚本。
+浏览器扩展，用于从豆包、Dola 和千问页面提取图片与视频资源，并支持手动或自动下载。
 
-仓库地址：[scj725/ai-media-extractor](https://github.com/scj725/ai-media-extractor)
+[![Latest Release](https://img.shields.io/github/v/release/scj725/ai-media-extractor?display_name=tag)](https://github.com/scj725/ai-media-extractor/releases)
+[![License](https://img.shields.io/github/license/scj725/ai-media-extractor)](LICENSE)
 
-## 功能
+## 为什么使用
 
-- 提取豆包分享页中的图片资源。
-- 提取豆包视频；浏览器扩展会使用当前登录态请求平台返回的无水印播放流。
-- 提取千问聊天页和分享页中的图片资源。
-- 提取千问页面播放器已提供的视频地址。
-- 可在扩展弹窗中开启“检测到新素材时自动下载”；该选项默认关闭，并保存在浏览器本地，扩展更新不会重置。
-- 素材面板支持勾选多个图片或视频后批量下载，也可使用“全选”一次下载当前页面的全部素材。
-- 自动下载会持久化已成功下载的素材地址，刷新或重新打开页面不会重复下载；下载失败的素材会在下次继续尝试。
-- 可在扩展设置中点击“清除自动下载记录”，方便重新下载历史素材。
-- 提供本地 Web 页面，以及 `POST` / `GET` 形式的图片、视频解析 API。
-- 支持 Windows 系统代理和 `HTTP_PROXY`、`HTTPS_PROXY` 环境变量。
+- 无需本地服务器，安装后在已登录页面直接使用。
+- 支持图片、视频筛选，批量选择、批量下载和 ZIP 打包。
+- 自动按平台、对话标题和序号命名，素材更容易整理。
+- 下载显示进度，失败后可以直接重试。
+- 支持重新扫描、复制地址和自动下载新素材。
+- Edge 和 Firefox 功能保持同步。
 
-## 支持范围
+## 界面预览
 
-| 平台 | 页面类型 | 本地 API | 浏览器扩展 / 脚本 |
-| --- | --- | --- | --- |
-| 豆包 | `www.doubao.com/thread/*` | 图片、视频 | 图片、视频 |
-| 豆包 | `www.doubao.com/chat/*` | 不适用 | 图片、视频 |
-| Dola | `www.dola.com/chat/*` | 不适用 | 图片、无水印视频（实验） |
-| 千问 | `www.qianwen.com/chat/*` | 不适用 | 图片、视频 |
-| 千问 | `www.qianwen.com/share/chat/*` | 图片 | 图片、视频 |
-| 千问 | `qianwen.my.cn/share/chat/*` | 图片、视频 | 图片、视频 |
+素材面板支持图片、视频混合展示、筛选、批量选择和 ZIP 下载：
 
-本地 API 通过公开分享链接请求资源；浏览器扩展和脚本运行在已登录页面中，因此适合需要页面登录态的豆包视频和普通千问聊天页。
+![素材提取器素材面板](docs/images/extension-media-panel.png)
 
-## 快速开始
+Dola 视频页面可以单独查看和下载视频素材：
 
-### 使用 uv
+![Dola 视频素材面板](docs/images/extension-dola-video.png)
 
-```powershell
-git clone https://github.com/scj725/ai-media-extractor.git
-cd ai-media-extractor
-uv sync
-uv run uvicorn app:app --host 127.0.0.1 --port 8000
-```
+扩展弹窗用于管理自动下载和 Dola 视频时长：
 
-### 使用 pip
+![扩展设置弹窗](docs/images/extension-popup.png)
 
-```powershell
-git clone https://github.com/scj725/ai-media-extractor.git
-cd ai-media-extractor
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-uvicorn app:app --host 127.0.0.1 --port 8000
-```
+## 支持平台
 
-启动后：
+- 豆包：`www.doubao.com/thread/*`、`www.doubao.com/chat/*`
+- Dola：`www.dola.com/chat/*`
+- 千问：`www.qianwen.com/chat/*`、`www.qianwen.com/share/chat/*`、`qianwen.my.cn/share/chat/*`
 
-- Web 工具：`http://127.0.0.1:8000`
-- API 文档：`http://127.0.0.1:8000/docs`
+扩展运行在用户已登录的目标页面中，不需要本地服务器或额外运行时。
 
-### Docker 本地构建
-
-```powershell
-docker build -t ai-media-extractor .
-docker run --rm -p 8000:8000 --name ai-media-extractor ai-media-extractor
-```
-
-启动后访问 `http://127.0.0.1:8000`。项目没有提供 Docker Hub 镜像，需要在本地构建。
-
-## API
-
-### 解析图片
-
-```http
-POST /parse
-Content-Type: application/json
-```
-
-```json
-{
-  "url": "https://www.doubao.com/thread/xxxxxxxx",
-  "return_raw": false
-}
-```
-
-### 解析视频
-
-```http
-POST /parse-video
-Content-Type: application/json
-```
-
-```json
-{
-  "url": "https://www.doubao.com/thread/xxxxxxxx",
-  "return_raw": false
-}
-```
-
-也可以使用 `GET /parse?url=...` 和 `GET /parse-video?url=...`。`return_raw: true` 会返回平台原始响应，便于排查页面结构变化。
-
-## 浏览器扩展
+## 安装
 
 ### Chrome / Edge
 
-Chrome 扩展 `v0.5.6` 已试验性支持 Dola 对话页面（`https://www.dola.com/chat/*`）。图片复用豆包流式解析；视频优先从 Dola 的 `chain/single` 响应中提取原始地址，带水印的页面预览地址不会加入素材列表。Dola 视频时长通过 JSON.stringify、fetch 和 XHR 三层注入；可请求 15 秒或试验性的 30 秒视频。
-
 1. 打开 `chrome://extensions/` 或 `edge://extensions/`。
-2. 开启开发者模式。
+2. 开启“开发者模式”。
 3. 点击“加载已解压的扩展程序”。
 4. 选择 `extension/edge` 目录。
-5. 登录目标平台，打开目标页面并刷新，然后点击右下角素材按钮。
-
-自动下载设置：点击浏览器工具栏中的扩展图标，勾选“检测到新素材时自动下载”。关闭后只保留手动下载；浏览器可能会对短时间内的多次下载显示一次允许提示。
 
 ### Firefox
-
-Firefox 扩展要求 Firefox 128 或更高版本：
 
 1. 打开 `about:debugging#/runtime/this-firefox`。
 2. 点击“临时载入附加组件”。
 3. 选择 `extension/firefox/manifest.json`。
-4. 登录目标平台，打开目标页面并刷新，然后点击右下角素材按钮。
 
-临时载入的扩展会在 Firefox 退出后被移除，重新启动 Firefox 后需要再次载入。正式签名发布需通过 Firefox Add-ons 平台打包和签名。
+登录目标平台后刷新页面，点击页面右下角的素材按钮即可使用。面板会显示当前平台和对话标题，可按图片/视频筛选，点击“重新扫描”重新读取当前页面。扩展弹窗中可以开启新素材自动下载，设置保存在浏览器本地。
 
-不要选择项目根目录。Chrome/Edge 的扩展根目录是 `extension/edge`；Firefox 需要选择 `extension/firefox/manifest.json`。项目根目录可能包含 Python 的 `__pycache__`，浏览器会拒绝加载。
+## 打包
 
-Firefox 实测使用步骤：
-
-1. 在 Firefox 中打开 `about:debugging#/runtime/this-firefox`。
-2. 点击“临时载入附加组件”，选择 `extension/firefox/manifest.json`。
-3. 登录豆包或千问，打开目标页面并刷新。
-4. 点击右下角素材按钮进行提取和下载。
-
-Firefox 临时附加组件在浏览器退出后会被移除，重新启动后需要再次载入。
-
-## Tampermonkey
-
-1. 安装 Tampermonkey。
-2. 新建脚本。
-3. 粘贴 [ai-media-extractor.user.js](extension/tampermonkey-script/ai-media-extractor.user.js) 的完整内容并保存。
-4. 刷新豆包、Dola 或千问页面，点击右下角素材按钮。
-
-在 Dola 页面生成视频前，可从 Tampermonkey 扩展的脚本菜单选择“Dola 视频时长：平台默认”、“15 秒”或“30 秒（实验）”；选择后脚本会刷新页面，使请求拦截器按新设置生效。30 秒是否可用由 Dola 当前账号、模型和服务端策略决定。
-
-Dola 视频优先从 `chain/single` 响应提取并解码原始视频地址，页面中带水印的预览地址不会加入下载列表。油猴脚本会在页面脚本之前安装拦截器，以便读取历史素材和新生成素材。
-
-脚本已配置 GitHub 更新地址。每次发布脚本改动时，递增脚本头部的 `@version` 后推送到 `main` 分支。
-
-同一个页面不要同时启用浏览器扩展和 Tampermonkey 脚本。两者功能重叠，同时运行会重复注入素材面板和网络拦截器。测试 Firefox 时建议暂时停用油猴脚本，只加载 `extension/firefox`。
-
-## 代理
-
-程序会优先使用 `HTTP_PROXY`、`HTTPS_PROXY`，其次读取 Windows 系统代理。需要手动指定时：
+在 Windows PowerShell 中执行：
 
 ```powershell
-$env:HTTPS_PROXY = "http://127.0.0.1:7890"
-$env:HTTP_PROXY = "http://127.0.0.1:7890"
+./scripts/package-extensions.ps1
 ```
 
-端口请按本机代理软件配置调整。
+ZIP 文件会生成在 `dist/` 目录，分别对应 Chrome、Edge 和 Firefox。GitHub Actions 也会在推送 `v*` 标签时自动打包并发布附件。
 
-## 常见问题
+## 反馈与贡献
 
-- 豆包视频没有显示：确认已登录豆包，并在视频生成完成后刷新页面。扩展不会降级下载已知带水印的视频流。
-- 千问视频没有显示：确认聊天页面中的视频卡片已经加载完成，再打开素材面板。
-- 扩展更新后无变化：在扩展管理页点击“重新加载”，然后使用 `Ctrl + F5` 刷新目标页面。
-- API 返回网络错误：确认 Python 进程可访问目标平台和对应 CDN，必要时配置代理。
+遇到平台页面结构变化、下载失败或新的适配需求，请提交 [Issue](https://github.com/scj725/ai-media-extractor/issues)，附上浏览器版本、目标平台、页面类型和可复现步骤，不要提交 Cookie、Token 或聊天内容。欢迎提交 Pull Request，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-### Firefox 控制台出现 `selectAllBtn is null`
+## 隐私
 
-通常是 Firefox 扩展和 Tampermonkey 脚本同时运行造成的重复注入。请在 Tampermonkey 中暂时停用本脚本，只保留 Firefox 扩展，然后重新加载扩展并使用 `Ctrl + F5` 刷新页面。
+扩展只处理匹配页面中的媒体请求，不会向开发者服务器上传聊天内容、媒体、Cookie 或账号信息。详细说明见 [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md)。
 
-### Firefox 控制台出现 `Permission denied to access property "id"`
+## 许可
 
-这是旧版扩展在页面脚本与扩展隔离世界之间传递对象消息导致的兼容性问题。请更新到当前代码后，在 `about:debugging#/runtime/this-firefox` 点击“重新加载”，关闭并重新打开豆包分享页；同时确认该页面没有启用 Tampermonkey 版本。当前版本已使用字符串消息桥接，不应再出现此错误。
+本项目基于 [ihmily/doubao-nomark](https://github.com/ihmily/doubao-nomark) 的 MIT 许可证代码修改而来。分发时请保留 [LICENSE](LICENSE)。
 
-### Firefox 控制台出现浏览器或平台警告
-
-`WEBGL_debug_renderer_info is deprecated`、传感器弃用提示、`screen.availWidth` 指纹防护提示和豆包 CDN 自身的 `参数错误` 通常来自浏览器或目标页面，不是本项目的扩展清单错误。优先检查是否能正常打开素材面板和下载资源。
-
-## 交流与反馈
-
-- QQ 交流群：`771436309`
-- 问题反馈：[GitHub Issues](https://github.com/scj725/ai-media-extractor/issues)
-- 项目地址：[scj725/ai-media-extractor](https://github.com/scj725/ai-media-extractor)
-
-反馈问题时请提供浏览器名称及版本、扩展或脚本版本、页面类型、复现步骤和控制台报错截图。请勿发送账号、Cookie、Token 等敏感信息。
-
-## 许可与来源
-
-本项目基于开源项目 [ihmily/doubao-nomark](https://github.com/ihmily/doubao-nomark) 的 MIT 许可证代码进行修改与重构。原版权及 MIT 许可证文本保留在 [LICENSE](LICENSE) 中；分发本项目或其衍生版本时，必须保留该文件。
-
-## 注意
-
-使用本服务时请遵守豆包、千问等目标平台的使用条款、内容权利和相关法律法规。请仅处理你有权访问、保存或使用的内容。
+使用扩展时请遵守目标平台的服务条款及相关法律法规，仅处理你有权访问和保存的内容。
