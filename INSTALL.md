@@ -18,3 +18,5 @@ Firefox 临时扩展在浏览器退出后会被移除，重新启动后需要再
 加载扩展后登录豆包、Dola 或千问，打开支持的页面并刷新。点击页面右下角素材按钮提取资源，点击浏览器工具栏中的扩展图标可配置自动下载。
 
 不要选择项目根目录作为扩展目录：Chrome/Edge 使用 `extension/edge`，Firefox 使用 `extension/firefox/manifest.json`。
+
+问题反馈和交流：QQ群 `771436309`，也可以提交 [GitHub Issue](https://github.com/scj725/ai-media-extractor/issues)。请勿发送账号、Cookie 或 Token。

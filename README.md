@@ -67,6 +67,8 @@ ZIP 文件会生成在 `dist/` 目录，分别对应 Chrome、Edge 和 Firefox�
 
 遇到平台页面结构变化、下载失败或新的适配需求，请提交 [Issue](https://github.com/scj725/ai-media-extractor/issues)，附上浏览器版本、目标平台、页面类型和可复现步骤，不要提交 Cookie、Token 或聊天内容。欢迎提交 Pull Request，详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
+QQ群：`771436309`
+
 ## 隐私
 
 扩展只处理匹配页面中的媒体请求，不会向开发者服务器上传聊天内容、媒体、Cookie 或账号信息。详细说明见 [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md)。
